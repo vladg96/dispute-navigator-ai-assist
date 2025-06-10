@@ -30,44 +30,20 @@ export class IntegrailService {
   private static readonly AGENT_ID = '7qnxaDK5Z2v8GKTJc';
   private static readonly STORAGE_BASE_URL = 'https://storage-service.integrail.ai/api';
   private static readonly AUTH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2NvdW50SWQiOiJRNGdtckI4akNmeDVNRDdOeSIsImlhdCI6MTc0NTk1NjUxNX0.w-d7F6ufcRto_5R7IDAba1WJxOUHFAVNR9z1rjLl23E';
+  private static readonly UPLOAD_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2NvdW50SWQiOiJRNGdtckI4akNmeDVNRDdOeSIsInVzZXJJZCI6IlE0Z21yQjhqQ2Z4NU1EN055IiwiaWF0IjoxNzQ1OTc1NTk0LCJleHAiOjE3NDYwNjE5OTR9.lMQR-BqWm0S2cUpGhNcI0X3E8OqgD5dqd-wXaIzQZHQ';
 
-  static async getStorageToken(): Promise<string> {
-    try {
-      console.log('Getting storage token...');
-      const response = await fetch(`${this.API_BASE_URL}/storage/token`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${this.AUTH_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        console.error('Failed to get storage token:', response.status, response.statusText);
-        throw new Error(`Failed to get storage token: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      console.log('Storage token retrieved successfully');
-      return result.token;
-    } catch (error) {
-      console.error('Error getting storage token:', error);
-      throw new Error('Unable to get storage access token. Please try again.');
-    }
-  }
-
-  static async uploadFileToStorage(file: File, storageToken: string): Promise<{ url: string; fileName: string }> {
+  static async uploadFileToStorage(file: File): Promise<{ url: string; fileName: string }> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('accountId', 'Q4gmrB8jCfx5MD7Ny');
 
-    console.log('Uploading file with token:', storageToken.substring(0, 10) + '...');
+    console.log('Uploading file to Integrail storage...');
 
     try {
       const response = await fetch(`${this.STORAGE_BASE_URL}/upload`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${storageToken}`,
+          'Authorization': `Bearer ${this.UPLOAD_TOKEN}`,
         },
         body: formData,
       });
@@ -157,19 +133,15 @@ export class IntegrailService {
 
   static async extractFlightData(file: File): Promise<IntegrailFlightData> {
     try {
-      // Step 1: Get storage token
-      console.log('Getting storage token...');
-      const storageToken = await this.getStorageToken();
-      
-      // Step 2: Upload file to storage
+      // Step 1: Upload file to storage
       console.log('Uploading file to Integrail storage...');
-      const { url, fileName } = await this.uploadFileToStorage(file, storageToken);
+      const { url, fileName } = await this.uploadFileToStorage(file);
       
-      // Step 3: Execute the agent
+      // Step 2: Execute the agent
       console.log('Executing Integrail agent...');
       const executionId = await this.executeAgent(url, fileName);
       
-      // Step 4: Poll for completion
+      // Step 3: Poll for completion
       console.log('Polling for execution completion...');
       let attempts = 0;
       const maxAttempts = 30; // 30 seconds timeout
