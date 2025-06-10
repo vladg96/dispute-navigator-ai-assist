@@ -1,10 +1,9 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DisputeFormData } from '@/types/dispute';
-import { FileText, Calendar, MapPin, Plane, User, AlertCircle, Clock, CheckCircle } from 'lucide-react';
+import { FileText, Calendar, MapPin, Plane, User, AlertCircle, Clock, CheckCircle, Search } from 'lucide-react';
 
 interface CaseSummaryStepProps {
   formData: DisputeFormData;
