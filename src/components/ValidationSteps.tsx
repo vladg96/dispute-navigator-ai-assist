@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card } from '@/components/ui/card';
 import { DisputeFormData, StepValidationResult } from '@/types/dispute';
-import { CheckCircle, AlertTriangle, Info, Loader2, Shield, UserCheck, AlertCircle, Upload, X, FileText } from 'lucide-react';
+import { CheckCircle, AlertTriangle, Info, Loader2, Shield, UserCheck, AlertCircle, Upload, X, FileText, Edit } from 'lucide-react';
 
 interface ValidationStepProps {
   formData: DisputeFormData;
@@ -333,6 +332,7 @@ export const FlightDataValidationStep: React.FC<ValidationStepProps & {
   totalSteps
 }) => {
   const [flightDocument, setFlightDocument] = React.useState<File | null>(null);
+  const [entryMethod, setEntryMethod] = React.useState<'upload' | 'manual'>('upload');
 
   const handleFlightDocumentUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -358,6 +358,18 @@ export const FlightDataValidationStep: React.FC<ValidationStepProps & {
     setFlightDocument(null);
   };
 
+  const isFormComplete = () => {
+    if (entryMethod === 'upload') {
+      return flightDocument !== null;
+    } else {
+      return formData.bookingReference && 
+             formData.flightNumber && 
+             formData.flightDate && 
+             formData.origin && 
+             formData.destination;
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="text-center">
@@ -370,141 +382,203 @@ export const FlightDataValidationStep: React.FC<ValidationStepProps & {
       <Card className="p-6 bg-slate-800 border-slate-700">
         <h4 className="text-lg font-semibold text-white mb-6">Flight & Booking Details</h4>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <Label htmlFor="bookingReference" className="text-gray-300 font-medium">Booking Reference *</Label>
-            <div className="flex gap-2 mt-2">
-              <Input
-                id="bookingReference"
-                value={formData.bookingReference}
-                onChange={(e) => onInputChange('bookingReference', e.target.value.toUpperCase())}
-                placeholder="ABC123"
-                maxLength={6}
-                className="bg-slate-700 border-slate-600 text-white placeholder-gray-400"
-              />
-              <Button 
-                onClick={onVerifyBooking}
-                disabled={!formData.bookingReference || formData.bookingReference.length !== 6 || isValidating}
-                variant="outline"
-                className="bg-slate-700 text-white hover:bg-slate-600"
-              >
-                {isValidating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify'}
-              </Button>
-            </div>
-          </div>
-          
-          <div>
-            <Label htmlFor="flightNumber" className="text-gray-300 font-medium">Flight Number *</Label>
-            <Input
-              id="flightNumber"
-              value={formData.flightNumber}
-              onChange={(e) => onInputChange('flightNumber', e.target.value.toUpperCase())}
-              placeholder="SV123"
-              className="bg-slate-700 border-slate-600 text-white placeholder-gray-400 mt-2"
-            />
-          </div>
-          
-          <div>
-            <Label htmlFor="flightDate" className="text-gray-300 font-medium">Flight Date *</Label>
-            <Input
-              id="flightDate"
-              type="date"
-              value={formData.flightDate}
-              onChange={(e) => onInputChange('flightDate', e.target.value)}
-              className="bg-slate-700 border-slate-600 text-white mt-2"
-            />
-          </div>
-          
-          <div>
-            <Label htmlFor="origin" className="text-gray-300 font-medium">Origin Airport *</Label>
-            <Input
-              id="origin"
-              value={formData.origin}
-              onChange={(e) => onInputChange('origin', e.target.value.toUpperCase())}
-              placeholder="RUH"
-              maxLength={3}
-              className="bg-slate-700 border-slate-600 text-white placeholder-gray-400 mt-2"
-            />
-          </div>
-          
-          <div>
-            <Label htmlFor="destination" className="text-gray-300 font-medium">Destination Airport *</Label>
-            <Input
-              id="destination"
-              value={formData.destination}
-              onChange={(e) => onInputChange('destination', e.target.value.toUpperCase())}
-              placeholder="JED"
-              maxLength={3}
-              className="bg-slate-700 border-slate-600 text-white placeholder-gray-400 mt-2"
-            />
+        {/* Entry Method Selection */}
+        <div className="mb-8">
+          <Label className="text-gray-300 font-medium mb-4 block">How would you like to provide your flight information? *</Label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button
+              type="button"
+              onClick={() => setEntryMethod('upload')}
+              className={`p-4 rounded-lg border-2 transition-all ${
+                entryMethod === 'upload'
+                  ? 'border-blue-500 bg-blue-900/20'
+                  : 'border-slate-600 bg-slate-700 hover:border-slate-500'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${
+                  entryMethod === 'upload' ? 'bg-blue-600' : 'bg-slate-600'
+                }`}>
+                  <Upload className="h-5 w-5" />
+                </div>
+                <div className="text-left">
+                  <h5 className="font-medium text-white">Upload Document</h5>
+                  <p className="text-sm text-gray-400">Upload boarding pass or receipt</p>
+                </div>
+              </div>
+            </button>
+            
+            <button
+              type="button"
+              onClick={() => setEntryMethod('manual')}
+              className={`p-4 rounded-lg border-2 transition-all ${
+                entryMethod === 'manual'
+                  ? 'border-blue-500 bg-blue-900/20'
+                  : 'border-slate-600 bg-slate-700 hover:border-slate-500'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${
+                  entryMethod === 'manual' ? 'bg-blue-600' : 'bg-slate-600'
+                }`}>
+                  <Edit className="h-5 w-5" />
+                </div>
+                <div className="text-left">
+                  <h5 className="font-medium text-white">Manual Entry</h5>
+                  <p className="text-sm text-gray-400">Enter details manually</p>
+                </div>
+              </div>
+            </button>
           </div>
         </div>
 
-        {/* Flight Document Upload Section */}
-        <div className="mt-8">
-          <Label className="text-gray-300 font-medium">Boarding Pass / Flight Receipt (Optional)</Label>
-          <p className="text-sm text-gray-400 mt-1 mb-4">
-            Upload your boarding pass or flight receipt to auto-fill booking details and strengthen your case
-          </p>
-          
-          {!flightDocument ? (
-            <div className="border-2 border-dashed border-slate-600 rounded-lg p-6 text-center">
-              <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-400 mb-4">
-                <span className="font-medium">Click to upload</span> your boarding pass or flight receipt
-              </p>
-              <p className="text-xs text-gray-500 mb-4">
-                Supported formats: JPEG, PNG, WebP, PDF (Max 10MB)
-              </p>
-              <input
-                type="file"
-                accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf"
-                onChange={handleFlightDocumentUpload}
-                className="hidden"
-                id="flightDocumentUpload"
-              />
-              <Button 
-                type="button"
-                onClick={() => document.getElementById('flightDocumentUpload')?.click()}
-                variant="outline"
-                className="bg-slate-700 text-white hover:bg-slate-600"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Upload Document
-              </Button>
-            </div>
-          ) : (
-            <div className="bg-slate-700 rounded-lg p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="bg-green-600 rounded-lg p-2">
-                  <CheckCircle className="h-4 w-4" />
+        {entryMethod === 'upload' ? (
+          // Document Upload Section
+          <div>
+            <Label className="text-gray-300 font-medium">Boarding Pass / Flight Receipt *</Label>
+            <p className="text-sm text-gray-400 mt-1 mb-4">
+              Upload your boarding pass or flight receipt - we'll auto-extract the flight details
+            </p>
+            
+            {!flightDocument ? (
+              <div className="border-2 border-dashed border-slate-600 rounded-lg p-6 text-center">
+                <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-400 mb-4">
+                  <span className="font-medium">Click to upload</span> your boarding pass or flight receipt
+                </p>
+                <p className="text-xs text-gray-500 mb-4">
+                  Supported formats: JPEG, PNG, WebP, PDF (Max 10MB)
+                </p>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf"
+                  onChange={handleFlightDocumentUpload}
+                  className="hidden"
+                  id="flightDocumentUpload"
+                />
+                <Button 
+                  type="button"
+                  onClick={() => document.getElementById('flightDocumentUpload')?.click()}
+                  variant="outline"
+                  className="bg-slate-700 text-white hover:bg-slate-600"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload Document
+                </Button>
+              </div>
+            ) : (
+              <div className="bg-slate-700 rounded-lg p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="bg-green-600 rounded-lg p-2">
+                    <CheckCircle className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-white font-medium">{flightDocument.name}</p>
+                    <p className="text-xs text-gray-400">
+                      {(flightDocument.size / 1024 / 1024).toFixed(2)} MB
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-white font-medium">{flightDocument.name}</p>
-                  <p className="text-xs text-gray-400">
-                    {(flightDocument.size / 1024 / 1024).toFixed(2)} MB
-                  </p>
+                <Button
+                  type="button"
+                  onClick={removeFlightDocument}
+                  variant="ghost"
+                  size="sm"
+                  className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+            
+            <div className="bg-green-900/20 border border-green-500 rounded-lg p-3 mt-4">
+              <p className="text-green-200 text-xs">
+                <strong>Automatic Processing:</strong> Our AI will extract flight details from your document automatically. 
+                You can review and edit the extracted information before proceeding.
+              </p>
+            </div>
+          </div>
+        ) : (
+          // Manual Entry Section
+          <div>
+            <div className="bg-blue-900/20 border border-blue-500 rounded-lg p-4 mb-6">
+              <p className="text-blue-200 text-sm">
+                <strong>Manual Entry:</strong> Please fill in all flight details accurately. 
+                This information will be verified against airline databases.
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <Label htmlFor="bookingReference" className="text-gray-300 font-medium">Booking Reference *</Label>
+                <div className="flex gap-2 mt-2">
+                  <Input
+                    id="bookingReference"
+                    value={formData.bookingReference}
+                    onChange={(e) => onInputChange('bookingReference', e.target.value.toUpperCase())}
+                    placeholder="ABC123"
+                    maxLength={6}
+                    className="bg-slate-700 border-slate-600 text-white placeholder-gray-400"
+                  />
+                  <Button 
+                    onClick={onVerifyBooking}
+                    disabled={!formData.bookingReference || formData.bookingReference.length !== 6 || isValidating}
+                    variant="outline"
+                    className="bg-slate-700 text-white hover:bg-slate-600"
+                  >
+                    {isValidating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify'}
+                  </Button>
                 </div>
               </div>
-              <Button
-                type="button"
-                onClick={removeFlightDocument}
-                variant="ghost"
-                size="sm"
-                className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
-              >
-                <X className="h-4 w-4" />
-              </Button>
+              
+              <div>
+                <Label htmlFor="flightNumber" className="text-gray-300 font-medium">Flight Number *</Label>
+                <Input
+                  id="flightNumber"
+                  value={formData.flightNumber}
+                  onChange={(e) => onInputChange('flightNumber', e.target.value.toUpperCase())}
+                  placeholder="SV123"
+                  className="bg-slate-700 border-slate-600 text-white placeholder-gray-400 mt-2"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="flightDate" className="text-gray-300 font-medium">Flight Date *</Label>
+                <Input
+                  id="flightDate"
+                  type="date"
+                  value={formData.flightDate}
+                  onChange={(e) => onInputChange('flightDate', e.target.value)}
+                  className="bg-slate-700 border-slate-600 text-white mt-2"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="origin" className="text-gray-300 font-medium">Origin Airport *</Label>
+                <Input
+                  id="origin"
+                  value={formData.origin}
+                  onChange={(e) => onInputChange('origin', e.target.value.toUpperCase())}
+                  placeholder="RUH"
+                  maxLength={3}
+                  className="bg-slate-700 border-slate-600 text-white placeholder-gray-400 mt-2"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="destination" className="text-gray-300 font-medium">Destination Airport *</Label>
+                <Input
+                  id="destination"
+                  value={formData.destination}
+                  onChange={(e) => onInputChange('destination', e.target.value.toUpperCase())}
+                  placeholder="JED"
+                  maxLength={3}
+                  className="bg-slate-700 border-slate-600 text-white placeholder-gray-400 mt-2"
+                />
+              </div>
             </div>
-          )}
-          
-          <div className="bg-blue-900/20 border border-blue-500 rounded-lg p-3 mt-4">
-            <p className="text-blue-200 text-xs">
-              <strong>Tip:</strong> Uploading your boarding pass or flight receipt can help auto-fill 
-              the booking details above and provides additional verification for your dispute.
-            </p>
           </div>
-        </div>
+        )}
 
         {bookingVerificationResult && (
           <div className="mt-6">
@@ -571,7 +645,7 @@ export const FlightDataValidationStep: React.FC<ValidationStepProps & {
           </Button>
           <Button 
             onClick={onNext}
-            disabled={!bookingVerificationResult?.exists}
+            disabled={!isFormComplete() || (entryMethod === 'manual' && !bookingVerificationResult?.exists)}
             className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
           >
             Continue to Complaint
