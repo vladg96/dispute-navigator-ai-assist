@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card } from '@/components/ui/card';
 import { DisputeFormData, StepValidationResult } from '@/types/dispute';
-import { CheckCircle, AlertTriangle, Info, Loader2, Shield, UserCheck, AlertCircle, Upload, X } from 'lucide-react';
+import { CheckCircle, AlertTriangle, Info, Loader2, Shield, UserCheck, AlertCircle, Upload, X, FileText } from 'lucide-react';
 
 interface ValidationStepProps {
   formData: DisputeFormData;
@@ -331,6 +332,32 @@ export const FlightDataValidationStep: React.FC<ValidationStepProps & {
   stepNumber,
   totalSteps
 }) => {
+  const [flightDocument, setFlightDocument] = React.useState<File | null>(null);
+
+  const handleFlightDocumentUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
+      if (!allowedTypes.includes(file.type)) {
+        alert('Please upload a valid file (JPEG, PNG, WebP, or PDF)');
+        return;
+      }
+      
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('File size must be less than 10MB');
+        return;
+      }
+      
+      setFlightDocument(file);
+    }
+  };
+
+  const removeFlightDocument = () => {
+    setFlightDocument(null);
+  };
+
   return (
     <div className="space-y-6">
       <div className="text-center">
@@ -410,6 +437,72 @@ export const FlightDataValidationStep: React.FC<ValidationStepProps & {
               maxLength={3}
               className="bg-slate-700 border-slate-600 text-white placeholder-gray-400 mt-2"
             />
+          </div>
+        </div>
+
+        {/* Flight Document Upload Section */}
+        <div className="mt-8">
+          <Label className="text-gray-300 font-medium">Boarding Pass / Flight Receipt (Optional)</Label>
+          <p className="text-sm text-gray-400 mt-1 mb-4">
+            Upload your boarding pass or flight receipt to auto-fill booking details and strengthen your case
+          </p>
+          
+          {!flightDocument ? (
+            <div className="border-2 border-dashed border-slate-600 rounded-lg p-6 text-center">
+              <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-400 mb-4">
+                <span className="font-medium">Click to upload</span> your boarding pass or flight receipt
+              </p>
+              <p className="text-xs text-gray-500 mb-4">
+                Supported formats: JPEG, PNG, WebP, PDF (Max 10MB)
+              </p>
+              <input
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf"
+                onChange={handleFlightDocumentUpload}
+                className="hidden"
+                id="flightDocumentUpload"
+              />
+              <Button 
+                type="button"
+                onClick={() => document.getElementById('flightDocumentUpload')?.click()}
+                variant="outline"
+                className="bg-slate-700 text-white hover:bg-slate-600"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Upload Document
+              </Button>
+            </div>
+          ) : (
+            <div className="bg-slate-700 rounded-lg p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="bg-green-600 rounded-lg p-2">
+                  <CheckCircle className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-white font-medium">{flightDocument.name}</p>
+                  <p className="text-xs text-gray-400">
+                    {(flightDocument.size / 1024 / 1024).toFixed(2)} MB
+                  </p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                onClick={removeFlightDocument}
+                variant="ghost"
+                size="sm"
+                className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+          
+          <div className="bg-blue-900/20 border border-blue-500 rounded-lg p-3 mt-4">
+            <p className="text-blue-200 text-xs">
+              <strong>Tip:</strong> Uploading your boarding pass or flight receipt can help auto-fill 
+              the booking details above and provides additional verification for your dispute.
+            </p>
           </div>
         </div>
 
