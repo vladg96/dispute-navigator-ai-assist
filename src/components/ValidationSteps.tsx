@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +9,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card } from '@/components/ui/card';
 import { DisputeFormData, StepValidationResult } from '@/types/dispute';
-import { CheckCircle, AlertTriangle, Info, Loader2, Shield, UserCheck, AlertCircle, Upload, X, FileText, Edit } from 'lucide-react';
+import { CheckCircle, AlertTriangle, Info, Loader2, Shield, UserCheck, AlertCircle, Upload, X, FileText, Edit, Wand2 } from 'lucide-react';
+import { IntegrailService } from '@/services/integrailService';
 
 interface ValidationStepProps {
   formData: DisputeFormData;
@@ -333,6 +335,9 @@ export const FlightDataValidationStep: React.FC<ValidationStepProps & {
 }) => {
   const [flightDocument, setFlightDocument] = React.useState<File | null>(null);
   const [entryMethod, setEntryMethod] = React.useState<'upload' | 'manual'>('upload');
+  const [storageToken, setStorageToken] = React.useState<string>('');
+  const [isProcessingDocument, setIsProcessingDocument] = React.useState(false);
+  const [extractedData, setExtractedData] = React.useState<any>(null);
 
   const handleFlightDocumentUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -351,16 +356,47 @@ export const FlightDataValidationStep: React.FC<ValidationStepProps & {
       }
       
       setFlightDocument(file);
+      setExtractedData(null); // Reset extracted data when new file is uploaded
     }
   };
 
   const removeFlightDocument = () => {
     setFlightDocument(null);
+    setExtractedData(null);
+  };
+
+  const handleProcessDocument = async () => {
+    if (!flightDocument || !storageToken.trim()) {
+      alert('Please upload a document and provide a storage token');
+      return;
+    }
+
+    setIsProcessingDocument(true);
+    try {
+      console.log('Starting document processing...');
+      const data = await IntegrailService.extractFlightData(flightDocument, storageToken);
+      setExtractedData(data);
+      
+      // Auto-fill form fields with extracted data
+      const formattedData = IntegrailService.formatFlightDataForForm(data);
+      onInputChange('bookingReference', formattedData.bookingReference);
+      onInputChange('flightNumber', formattedData.flightNumber);
+      onInputChange('flightDate', formattedData.flightDate);
+      onInputChange('origin', formattedData.origin);
+      onInputChange('destination', formattedData.destination);
+      
+      console.log('Document processed successfully:', data);
+    } catch (error) {
+      console.error('Document processing failed:', error);
+      alert(`Failed to process document: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsProcessingDocument(false);
+    }
   };
 
   const isFormComplete = () => {
     if (entryMethod === 'upload') {
-      return flightDocument !== null;
+      return flightDocument !== null && extractedData !== null;
     } else {
       return formData.bookingReference && 
              formData.flightNumber && 
@@ -435,6 +471,22 @@ export const FlightDataValidationStep: React.FC<ValidationStepProps & {
         {entryMethod === 'upload' ? (
           // Document Upload Section
           <div>
+            {/* Storage Token Input */}
+            <div className="mb-6">
+              <Label htmlFor="storageToken" className="text-gray-300 font-medium">Storage Access Token *</Label>
+              <p className="text-sm text-gray-400 mt-1 mb-2">
+                Please provide your Integrail storage token for secure document processing
+              </p>
+              <Input
+                id="storageToken"
+                type="password"
+                value={storageToken}
+                onChange={(e) => setStorageToken(e.target.value)}
+                placeholder="Enter your storage token"
+                className="bg-slate-700 border-slate-600 text-white placeholder-gray-400"
+              />
+            </div>
+
             <Label className="text-gray-300 font-medium">Boarding Pass / Flight Receipt *</Label>
             <p className="text-sm text-gray-400 mt-1 mb-4">
               Upload your boarding pass or flight receipt - we'll auto-extract the flight details
@@ -467,36 +519,158 @@ export const FlightDataValidationStep: React.FC<ValidationStepProps & {
                 </Button>
               </div>
             ) : (
-              <div className="bg-slate-700 rounded-lg p-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="bg-green-600 rounded-lg p-2">
-                    <CheckCircle className="h-4 w-4" />
+              <div className="space-y-4">
+                <div className="bg-slate-700 rounded-lg p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-green-600 rounded-lg p-2">
+                      <CheckCircle className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="text-white font-medium">{flightDocument.name}</p>
+                      <p className="text-xs text-gray-400">
+                        {(flightDocument.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-white font-medium">{flightDocument.name}</p>
-                    <p className="text-xs text-gray-400">
-                      {(flightDocument.size / 1024 / 1024).toFixed(2)} MB
-                    </p>
-                  </div>
+                  <Button
+                    type="button"
+                    onClick={removeFlightDocument}
+                    variant="ghost"
+                    size="sm"
+                    className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
-                <Button
-                  type="button"
-                  onClick={removeFlightDocument}
-                  variant="ghost"
-                  size="sm"
-                  className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+
+                {/* Process Document Button */}
+                {!extractedData && (
+                  <Button
+                    type="button"
+                    onClick={handleProcessDocument}
+                    disabled={isProcessingDocument || !storageToken.trim()}
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                  >
+                    {isProcessingDocument ? (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Processing Document...
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Wand2 className="h-4 w-4" />
+                        Extract Flight Data
+                      </div>
+                    )}
+                  </Button>
+                )}
+
+                {/* Extracted Data Display */}
+                {extractedData && (
+                  <div className="bg-green-900/20 border border-green-500 rounded-lg p-4">
+                    <h5 className="font-medium text-green-200 mb-3 flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4" />
+                      Extracted Flight Information
+                    </h5>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <span className="text-gray-400">Booking Reference:</span>
+                        <p className="text-white">{extractedData['Booking Reference'] || 'Not found'}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Flight Number:</span>
+                        <p className="text-white">{extractedData['Flight Number'] || 'Not found'}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Flight Date:</span>
+                        <p className="text-white">{extractedData['Flight Date'] || 'Not found'}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Route:</span>
+                        <p className="text-white">
+                          {extractedData.Route ? 
+                            `${extractedData.Route.Departure} → ${extractedData.Route.Arrival}` : 
+                            'Not found'
+                          }
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             
             <div className="bg-green-900/20 border border-green-500 rounded-lg p-3 mt-4">
               <p className="text-green-200 text-xs">
-                <strong>Automatic Processing:</strong> Our AI will extract flight details from your document automatically. 
-                You can review and edit the extracted information before proceeding.
+                <strong>AI Processing:</strong> Our AI will extract flight details from your document automatically. 
+                You can review and edit the extracted information in the form fields below.
               </p>
             </div>
+
+            {/* Form fields for extracted data */}
+            {extractedData && (
+              <div className="mt-6">
+                <h5 className="text-lg font-medium text-white mb-4">Review & Edit Extracted Data</h5>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="bookingReference" className="text-gray-300 font-medium">Booking Reference</Label>
+                    <Input
+                      id="bookingReference"
+                      value={formData.bookingReference}
+                      onChange={(e) => onInputChange('bookingReference', e.target.value.toUpperCase())}
+                      placeholder="ABC123"
+                      className="bg-slate-700 border-slate-600 text-white placeholder-gray-400 mt-1"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="flightNumber" className="text-gray-300 font-medium">Flight Number</Label>
+                    <Input
+                      id="flightNumber"
+                      value={formData.flightNumber}
+                      onChange={(e) => onInputChange('flightNumber', e.target.value.toUpperCase())}
+                      placeholder="SV123"
+                      className="bg-slate-700 border-slate-600 text-white placeholder-gray-400 mt-1"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="flightDate" className="text-gray-300 font-medium">Flight Date</Label>
+                    <Input
+                      id="flightDate"
+                      type="date"
+                      value={formData.flightDate}
+                      onChange={(e) => onInputChange('flightDate', e.target.value)}
+                      className="bg-slate-700 border-slate-600 text-white mt-1"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="origin" className="text-gray-300 font-medium">Origin Airport</Label>
+                    <Input
+                      id="origin"
+                      value={formData.origin}
+                      onChange={(e) => onInputChange('origin', e.target.value.toUpperCase())}
+                      placeholder="RUH"
+                      maxLength={3}
+                      className="bg-slate-700 border-slate-600 text-white placeholder-gray-400 mt-1"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="destination" className="text-gray-300 font-medium">Destination Airport</Label>
+                    <Input
+                      id="destination"
+                      value={formData.destination}
+                      onChange={(e) => onInputChange('destination', e.target.value.toUpperCase())}
+                      placeholder="JED"
+                      maxLength={3}
+                      className="bg-slate-700 border-slate-600 text-white placeholder-gray-400 mt-1"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           // Manual Entry Section
