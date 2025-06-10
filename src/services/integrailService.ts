@@ -31,81 +31,145 @@ export class IntegrailService {
   private static readonly STORAGE_BASE_URL = 'https://storage-service.integrail.ai/api';
   private static readonly AUTH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2NvdW50SWQiOiJRNGdtckI4akNmeDVNRDdOeSIsImlhdCI6MTc0NTk1NjUxNX0.w-d7F6ufcRto_5R7IDAba1WJxOUHFAVNR9z1rjLl23E';
 
+  static async getStorageToken(): Promise<string> {
+    try {
+      console.log('Getting storage token...');
+      const response = await fetch(`${this.API_BASE_URL}/storage/token`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.AUTH_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        console.error('Failed to get storage token:', response.status, response.statusText);
+        throw new Error(`Failed to get storage token: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('Storage token retrieved successfully');
+      return result.token;
+    } catch (error) {
+      console.error('Error getting storage token:', error);
+      throw new Error('Unable to get storage access token. Please try again.');
+    }
+  }
+
   static async uploadFileToStorage(file: File, storageToken: string): Promise<{ url: string; fileName: string }> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('accountId', 'Q4gmrB8jCfx5MD7Ny');
 
-    const response = await fetch(`${this.STORAGE_BASE_URL}/upload`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${storageToken}`,
-      },
-      body: formData,
-    });
+    console.log('Uploading file with token:', storageToken.substring(0, 10) + '...');
 
-    if (!response.ok) {
-      throw new Error(`Failed to upload file: ${response.statusText}`);
+    try {
+      const response = await fetch(`${this.STORAGE_BASE_URL}/upload`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${storageToken}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Upload failed:', response.status, response.statusText, errorText);
+        throw new Error(`Failed to upload file: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('File uploaded successfully:', result);
+      return {
+        url: result.url,
+        fileName: file.name
+      };
+    } catch (error) {
+      console.error('Error during file upload:', error);
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        throw new Error('Network error: Unable to connect to the file upload service. Please check your internet connection and try again.');
+      }
+      throw error;
     }
-
-    const result = await response.json();
-    return {
-      url: result.url,
-      fileName: file.name
-    };
   }
 
   static async executeAgent(fileUrl: string, fileName: string): Promise<string> {
-    const response = await fetch(`${this.API_BASE_URL}/agent/${this.AGENT_ID}/execute`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.AUTH_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        inputs: {
-          file: {
-            url: fileUrl,
-            fileName: fileName
+    try {
+      console.log('Executing agent with file:', fileName);
+      const response = await fetch(`${this.API_BASE_URL}/agent/${this.AGENT_ID}/execute`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.AUTH_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          inputs: {
+            file: {
+              url: fileUrl,
+              fileName: fileName
+            }
           }
-        }
-      }),
-    });
+        }),
+      });
 
-    if (!response.ok) {
-      throw new Error(`Failed to execute agent: ${response.statusText}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Agent execution failed:', response.status, response.statusText, errorText);
+        throw new Error(`Failed to execute agent: ${response.status} ${response.statusText}`);
+      }
+
+      const result: IntegrailExecutionResponse = await response.json();
+      console.log('Agent execution started:', result.executionId);
+      return result.executionId;
+    } catch (error) {
+      console.error('Error executing agent:', error);
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        throw new Error('Network error: Unable to connect to the document processing service. Please try again.');
+      }
+      throw error;
     }
-
-    const result: IntegrailExecutionResponse = await response.json();
-    return result.executionId;
   }
 
   static async getExecutionStatus(executionId: string): Promise<IntegrailStatusResponse> {
-    const response = await fetch(`${this.API_BASE_URL}/agent/${executionId}/status`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${this.AUTH_TOKEN}`,
-      },
-    });
+    try {
+      const response = await fetch(`${this.API_BASE_URL}/agent/${executionId}/status`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.AUTH_TOKEN}`,
+        },
+      });
 
-    if (!response.ok) {
-      throw new Error(`Failed to get execution status: ${response.statusText}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Status check failed:', response.status, response.statusText, errorText);
+        throw new Error(`Failed to get execution status: ${response.status} ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error getting execution status:', error);
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        throw new Error('Network error: Unable to check processing status. Please try again.');
+      }
+      throw error;
     }
-
-    return await response.json();
   }
 
-  static async extractFlightData(file: File, storageToken: string): Promise<IntegrailFlightData> {
+  static async extractFlightData(file: File): Promise<IntegrailFlightData> {
     try {
-      // Step 1: Upload file to storage
+      // Step 1: Get storage token
+      console.log('Getting storage token...');
+      const storageToken = await this.getStorageToken();
+      
+      // Step 2: Upload file to storage
       console.log('Uploading file to Integrail storage...');
       const { url, fileName } = await this.uploadFileToStorage(file, storageToken);
       
-      // Step 2: Execute the agent
+      // Step 3: Execute the agent
       console.log('Executing Integrail agent...');
       const executionId = await this.executeAgent(url, fileName);
       
-      // Step 3: Poll for completion
+      // Step 4: Poll for completion
       console.log('Polling for execution completion...');
       let attempts = 0;
       const maxAttempts = 30; // 30 seconds timeout
@@ -114,9 +178,11 @@ export class IntegrailService {
         await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
         
         const statusResponse = await this.getExecutionStatus(executionId);
+        console.log(`Attempt ${attempts + 1}: Status = ${statusResponse.execution.status}`);
         
         if (statusResponse.execution.status === 'finished') {
           if (statusResponse.execution.outputs?.['2_json']) {
+            console.log('Document processing completed successfully');
             return statusResponse.execution.outputs['2_json'];
           } else {
             throw new Error('No flight data extracted from document');
@@ -128,7 +194,7 @@ export class IntegrailService {
         attempts++;
       }
       
-      throw new Error('Document processing timeout');
+      throw new Error('Document processing timeout - please try again');
     } catch (error) {
       console.error('Error extracting flight data:', error);
       throw error;
