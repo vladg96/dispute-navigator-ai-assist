@@ -24,6 +24,22 @@ export interface StepValidationResult {
   isValid: boolean;
   errors: string[];
   warnings?: string[];
+  everworkerResult?: EverworkerValidationResult;
+}
+
+export interface EverworkerValidationResult {
+  isValid: boolean;
+  confidence: number;
+  validatedFields: {
+    name: boolean;
+    nationalId: boolean;
+    phone: boolean;
+    email: boolean;
+  };
+  warnings: string[];
+  errors: string[];
+  riskScore: number;
+  recommendations: string[];
 }
 
 export interface EligibilityResult {

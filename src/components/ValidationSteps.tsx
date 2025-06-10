@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card } from '@/components/ui/card';
 import { DisputeFormData, StepValidationResult } from '@/types/dispute';
-import { CheckCircle, AlertTriangle, Info, Loader2 } from 'lucide-react';
+import { CheckCircle, AlertTriangle, Info, Loader2, Shield, UserCheck, AlertCircle } from 'lucide-react';
 
 interface ValidationStepProps {
   formData: DisputeFormData;
@@ -22,26 +21,91 @@ interface ValidationStepProps {
   totalSteps: number;
 }
 
-// Step 1: Consumer Identity Validation
+// Step 1: Consumer Identity Validation with Everworker
 export const IdentityValidationStep: React.FC<ValidationStepProps> = ({
   formData,
   onInputChange,
   onNext,
   validationResult,
+  isValidating,
   stepNumber,
   totalSteps
 }) => {
+  const renderEverworkerResults = () => {
+    if (!validationResult?.everworkerResult) return null;
+
+    const { everworkerResult } = validationResult;
+    const confidencePercentage = Math.round(everworkerResult.confidence * 100);
+    
+    return (
+      <div className="mt-6 space-y-4">
+        {/* Overall Validation Status */}
+        <Card className="p-4 bg-slate-800 border-slate-600">
+          <div className="flex items-center gap-3 mb-3">
+            <div className={`p-2 rounded-lg ${
+              everworkerResult.isValid ? 'bg-green-600' : 'bg-red-600'
+            }`}>
+              {everworkerResult.isValid ? <UserCheck className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+            </div>
+            <div>
+              <h5 className="font-medium text-white">
+                {everworkerResult.isValid ? 'Identity Verified' : 'Identity Verification Failed'}
+              </h5>
+              <p className="text-sm text-gray-400">
+                Confidence: {confidencePercentage}% | Risk Score: {Math.round(everworkerResult.riskScore * 100)}%
+              </p>
+            </div>
+          </div>
+
+          {/* Field-by-field validation */}
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            {Object.entries(everworkerResult.validatedFields).map(([field, isValid]) => (
+              <div key={field} className="flex items-center gap-2">
+                <div className={`w-3 h-3 rounded-full ${isValid ? 'bg-green-500' : 'bg-red-500'}`} />
+                <span className="text-sm text-gray-300 capitalize">
+                  {field === 'nationalId' ? 'National ID' : field}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Recommendations */}
+          {everworkerResult.recommendations.length > 0 && (
+            <div className="text-sm text-gray-300">
+              <strong>AI Recommendations:</strong>
+              <ul className="list-disc list-inside mt-1 space-y-1">
+                {everworkerResult.recommendations.map((rec, index) => (
+                  <li key={index}>{rec}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </Card>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="text-center">
         <h3 className="text-2xl font-semibold text-white mb-2">
-          Step {stepNumber} of {totalSteps}: Identity Verification
+          Step {stepNumber} of {totalSteps}: AI-Powered Identity Verification
         </h3>
-        <p className="text-gray-400">Verify your identity and contact information</p>
+        <p className="text-gray-400">
+          Verify your identity with advanced AI validation powered by Everworker
+        </p>
       </div>
 
       <Card className="p-6 bg-slate-800 border-slate-700">
-        <h4 className="text-lg font-semibold text-white mb-6">Consumer Identity & Contact</h4>
+        <div className="flex items-center gap-3 mb-6">
+          <div className="bg-blue-600 rounded-lg p-2">
+            <Shield className="h-5 w-5" />
+          </div>
+          <div>
+            <h4 className="text-lg font-semibold text-white">Consumer Identity & Contact</h4>
+            <p className="text-sm text-gray-400">AI-enhanced validation for maximum security</p>
+          </div>
+        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
@@ -91,6 +155,25 @@ export const IdentityValidationStep: React.FC<ValidationStepProps> = ({
           </div>
         </div>
 
+        {/* Validation Loading State */}
+        {isValidating && (
+          <div className="mt-6">
+            <Alert className="bg-blue-900/20 border-blue-500">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <AlertDescription className="text-blue-200">
+                <div className="flex items-center gap-2">
+                  <span>AI is verifying your identity...</span>
+                </div>
+                <p className="text-xs mt-1">This may take a few seconds</p>
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
+
+        {/* Everworker Results */}
+        {renderEverworkerResults()}
+
+        {/* Standard Validation Results */}
         {validationResult && (
           <div className="mt-6">
             {validationResult.errors.length > 0 && (
@@ -124,9 +207,17 @@ export const IdentityValidationStep: React.FC<ValidationStepProps> = ({
         <div className="mt-8 flex justify-center">
           <Button 
             onClick={onNext}
+            disabled={isValidating}
             className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3"
           >
-            Validate Identity & Continue
+            {isValidating ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Validating...
+              </div>
+            ) : (
+              'Validate Identity & Continue'
+            )}
           </Button>
         </div>
       </Card>

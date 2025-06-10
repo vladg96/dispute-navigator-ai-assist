@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { CheckCircle, FileText, Search, Shield, Clock, User, Plane, AlertCircle, Upload } from 'lucide-react';
 
@@ -11,8 +10,8 @@ const Sidebar: React.FC<SidebarProps> = ({ currentStep = 1, onStepClick }) => {
   const workflowSteps = [
     {
       id: 1,
-      title: 'Consumer Identity',
-      subtitle: 'Personal Information',
+      title: 'AI Identity Validation',
+      subtitle: 'Everworker-powered verification',
       icon: User,
       stepRange: [1]
     },

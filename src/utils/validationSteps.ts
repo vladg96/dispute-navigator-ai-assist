@@ -1,25 +1,25 @@
-
-import { DisputeFormData } from '@/types/dispute';
+import { DisputeFormData, EverworkerValidationResult } from '@/types/dispute';
+import { EverworkerService } from '@/services/everworkerService';
 
 export interface StepValidationResult {
   isValid: boolean;
   errors: string[];
   warnings?: string[];
+  everworkerResult?: EverworkerValidationResult;
 }
 
-// Step 1: Consumer Identity & Contact Validation
-export const validateConsumerIdentity = (formData: Partial<DisputeFormData>): StepValidationResult => {
+// Step 1: Consumer Identity & Contact Validation with Everworker
+export const validateConsumerIdentity = async (formData: Partial<DisputeFormData>): Promise<StepValidationResult> => {
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  // Full name validation
+  // Basic field validation first
   if (!formData.consumerName?.trim()) {
     errors.push("Full name is required");
   } else if (formData.consumerName.trim().length < 2) {
     errors.push("Full name must be at least 2 characters long");
   }
 
-  // National ID/Passport validation
   if (!formData.nationalId?.trim()) {
     errors.push("National ID or Passport number is required");
   } else if (formData.nationalId.length < 8) {
@@ -28,24 +28,60 @@ export const validateConsumerIdentity = (formData: Partial<DisputeFormData>): St
     errors.push("National ID or Passport number must contain only letters and numbers");
   }
 
-  // Phone validation
   if (!formData.phone?.trim()) {
     errors.push("Phone number is required");
   } else if (!/^[\+]?[0-9\s\-\(\)]{10,}$/.test(formData.phone)) {
     errors.push("Please enter a valid phone number (minimum 10 digits)");
   }
 
-  // Email validation
   if (!formData.email?.trim()) {
     errors.push("Email address is required");
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
     errors.push("Please enter a valid email address");
   }
 
+  // If basic validation passes, proceed with Everworker validation
+  let everworkerResult: EverworkerValidationResult | undefined;
+  
+  if (errors.length === 0 && formData.consumerName && formData.nationalId && formData.phone && formData.email) {
+    try {
+      // Use mock validation for now, can be switched to real API when available
+      everworkerResult = await EverworkerService.mockValidateConsumerIdentity({
+        consumerName: formData.consumerName,
+        nationalId: formData.nationalId,
+        phone: formData.phone,
+        email: formData.email
+      });
+
+      // Add Everworker warnings and errors
+      if (everworkerResult.warnings.length > 0) {
+        warnings.push(...everworkerResult.warnings);
+      }
+      
+      if (everworkerResult.errors.length > 0) {
+        errors.push(...everworkerResult.errors);
+      }
+
+      // Add confidence-based warnings
+      if (everworkerResult.confidence < 0.8 && everworkerResult.confidence >= 0.5) {
+        warnings.push(`Identity confidence: ${Math.round(everworkerResult.confidence * 100)}% - Some details may need manual review`);
+      }
+
+      if (everworkerResult.riskScore > 0.7) {
+        warnings.push('High risk score detected - additional verification may be required');
+      }
+
+    } catch (error) {
+      console.error('Everworker validation failed:', error);
+      warnings.push('Identity validation service temporarily unavailable - proceeding with basic validation');
+    }
+  }
+
   return {
     isValid: errors.length === 0,
     errors,
-    warnings
+    warnings,
+    everworkerResult
   };
 };
 
