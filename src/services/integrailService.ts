@@ -1,4 +1,3 @@
-
 export interface IntegrailFlightData {
   'Booking Reference': string | null;
   'Flight Number': string | null;
@@ -23,6 +22,20 @@ export interface IntegrailStatusResponse {
       '2_json': IntegrailFlightData;
     };
   };
+}
+
+export interface DocumentProcessingResult {
+  fileName: string;
+  status: 'success' | 'failed' | 'processing';
+  data?: IntegrailFlightData;
+  error?: string;
+  executionId?: string;
+}
+
+export interface MultiDocumentResult {
+  results: DocumentProcessingResult[];
+  mergedData: IntegrailFlightData;
+  processingTime: number;
 }
 
 export class IntegrailService {
@@ -129,6 +142,164 @@ export class IntegrailService {
       }
       throw error;
     }
+  }
+
+  static async processMultipleDocuments(files: File[]): Promise<MultiDocumentResult> {
+    const startTime = Date.now();
+    console.log(`Starting parallel processing of ${files.length} documents`);
+    
+    try {
+      // Step 1: Upload all files in parallel
+      console.log('Uploading files in parallel...');
+      const uploadPromises = files.map(file => 
+        this.uploadFileToStorage(file).catch(error => ({
+          error: error.message,
+          fileName: file.name
+        }))
+      );
+      
+      const uploadResults = await Promise.all(uploadPromises);
+      
+      // Step 2: Start agent execution for successfully uploaded files
+      console.log('Starting agent executions...');
+      const executionPromises: Promise<DocumentProcessingResult>[] = [];
+      
+      uploadResults.forEach((result, index) => {
+        if ('error' in result) {
+          executionPromises.push(Promise.resolve({
+            fileName: result.fileName,
+            status: 'failed',
+            error: `Upload failed: ${result.error}`
+          }));
+        } else {
+          executionPromises.push(
+            this.processDocument(result.url, result.fileName)
+          );
+        }
+      });
+      
+      // Step 3: Wait for all processing to complete
+      const processingResults = await Promise.all(executionPromises);
+      
+      // Step 4: Merge successful results
+      const mergedData = this.mergeFlightData(
+        processingResults
+          .filter(result => result.status === 'success' && result.data)
+          .map(result => result.data!)
+      );
+      
+      const processingTime = Date.now() - startTime;
+      console.log(`Multi-document processing completed in ${processingTime}ms`);
+      
+      return {
+        results: processingResults,
+        mergedData,
+        processingTime
+      };
+      
+    } catch (error) {
+      console.error('Multi-document processing failed:', error);
+      throw error;
+    }
+  }
+
+  private static async processDocument(fileUrl: string, fileName: string): Promise<DocumentProcessingResult> {
+    try {
+      // Execute the agent
+      const executionId = await this.executeAgent(fileUrl, fileName);
+      
+      // Poll for completion
+      let attempts = 0;
+      const maxAttempts = 30;
+      
+      while (attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        const statusResponse = await this.getExecutionStatus(executionId);
+        
+        if (statusResponse.execution.status === 'finished') {
+          if (statusResponse.execution.outputs?.['2_json']) {
+            return {
+              fileName,
+              status: 'success',
+              data: statusResponse.execution.outputs['2_json'],
+              executionId
+            };
+          } else {
+            return {
+              fileName,
+              status: 'failed',
+              error: 'No flight data extracted from document',
+              executionId
+            };
+          }
+        } else if (statusResponse.execution.status === 'failed') {
+          return {
+            fileName,
+            status: 'failed',
+            error: 'Document processing failed',
+            executionId
+          };
+        }
+        
+        attempts++;
+      }
+      
+      return {
+        fileName,
+        status: 'failed',
+        error: 'Processing timeout',
+        executionId
+      };
+      
+    } catch (error) {
+      console.error(`Error processing document ${fileName}:`, error);
+      return {
+        fileName,
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  private static mergeFlightData(dataArray: IntegrailFlightData[]): IntegrailFlightData {
+    if (dataArray.length === 0) {
+      return {
+        'Booking Reference': null,
+        'Flight Number': null,
+        'Flight Date': null,
+        Route: null
+      };
+    }
+
+    if (dataArray.length === 1) {
+      return dataArray[0];
+    }
+
+    // Merge logic: prefer non-null values, use most recent data for conflicts
+    const merged: IntegrailFlightData = {
+      'Booking Reference': null,
+      'Flight Number': null,
+      'Flight Date': null,
+      Route: null
+    };
+
+    dataArray.forEach(data => {
+      if (data['Booking Reference'] && !merged['Booking Reference']) {
+        merged['Booking Reference'] = data['Booking Reference'];
+      }
+      if (data['Flight Number'] && !merged['Flight Number']) {
+        merged['Flight Number'] = data['Flight Number'];
+      }
+      if (data['Flight Date'] && !merged['Flight Date']) {
+        merged['Flight Date'] = data['Flight Date'];
+      }
+      if (data.Route && !merged.Route) {
+        merged.Route = data.Route;
+      }
+    });
+
+    return merged;
   }
 
   static async extractFlightData(file: File): Promise<IntegrailFlightData> {

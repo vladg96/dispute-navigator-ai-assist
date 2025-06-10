@@ -1,11 +1,12 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { DisputeFormData } from '@/types/dispute';
-import { Shield, FileText, CheckCircle, AlertTriangle, Clock, Zap } from 'lucide-react';
+import { Shield, FileText, CheckCircle, AlertTriangle, Clock, Zap, Files } from 'lucide-react';
+import { MultiDocumentUpload } from './MultiDocumentUpload';
+import { MultiDocumentResult } from '@/services/integrailService';
 
 interface DocumentAnalysisStepProps {
   formData: DisputeFormData;
@@ -24,7 +25,9 @@ export const DocumentAnalysisStep: React.FC<DocumentAnalysisStepProps> = ({
 }) => {
   const [analysisStage, setAnalysisStage] = useState(0);
   const [progress, setProgress] = useState(0);
-  const [isAnalyzing, setIsAnalyzing] = useState(true);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [showDocumentUpload, setShowDocumentUpload] = useState(true);
+  const [multiDocumentResult, setMultiDocumentResult] = useState<MultiDocumentResult | null>(null);
 
   const analysisStages = [
     { 
@@ -56,6 +59,14 @@ export const DocumentAnalysisStep: React.FC<DocumentAnalysisStepProps> = ({
       status: 'pending'
     }
   ];
+
+  const handleMultiDocumentProcessing = (result: MultiDocumentResult) => {
+    console.log('Multi-document processing completed:', result);
+    setMultiDocumentResult(result);
+    setShowDocumentUpload(false);
+    setIsAnalyzing(true);
+    setProgress(0);
+  };
 
   useEffect(() => {
     if (isAnalyzing) {
@@ -110,6 +121,117 @@ export const DocumentAnalysisStep: React.FC<DocumentAnalysisStepProps> = ({
       'Escalate to GACA if necessary'
     ]
   };
+
+  if (showDocumentUpload) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center mb-6">
+          <h2 className="text-3xl font-bold mb-2 text-white">Document Processing</h2>
+          <p className="text-gray-400">Upload multiple documents for AI analysis</p>
+          <div className="flex justify-center mt-4">
+            <Badge variant="outline" className="bg-purple-600 text-white border-purple-500">
+              Step {stepNumber} of {totalSteps}
+            </Badge>
+          </div>
+        </div>
+
+        <MultiDocumentUpload
+          onProcessingComplete={handleMultiDocumentProcessing}
+          maxFiles={5}
+          acceptedFileTypes={['.pdf', '.jpg', '.jpeg', '.png', '.webp']}
+        />
+
+        {/* Processing Results Summary */}
+        {multiDocumentResult && (
+          <Card className="bg-slate-800 border-slate-700 text-white">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Files className="h-5 w-5 text-blue-400" />
+                Document Processing Summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-gray-400">Documents Processed</p>
+                  <p className="font-medium">{multiDocumentResult.results.length}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-400">Processing Time</p>
+                  <p className="font-medium">{(multiDocumentResult.processingTime / 1000).toFixed(1)}s</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-400">Successful Extractions</p>
+                  <p className="font-medium text-green-400">
+                    {multiDocumentResult.results.filter(r => r.status === 'success').length}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-400">Failed Extractions</p>
+                  <p className="font-medium text-red-400">
+                    {multiDocumentResult.results.filter(r => r.status === 'failed').length}
+                  </p>
+                </div>
+              </div>
+
+              {/* Extracted Data Preview */}
+              {multiDocumentResult.mergedData && (
+                <div className="bg-slate-700 p-4 rounded-lg">
+                  <p className="text-sm font-medium mb-2">Extracted Flight Information</p>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="text-gray-400">Booking Ref:</span>
+                      <span className="ml-2">{multiDocumentResult.mergedData['Booking Reference'] || 'Not found'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Flight:</span>
+                      <span className="ml-2">{multiDocumentResult.mergedData['Flight Number'] || 'Not found'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Date:</span>
+                      <span className="ml-2">{multiDocumentResult.mergedData['Flight Date'] || 'Not found'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Route:</span>
+                      <span className="ml-2">
+                        {multiDocumentResult.mergedData.Route 
+                          ? `${multiDocumentResult.mergedData.Route.Departure} → ${multiDocumentResult.mergedData.Route.Arrival}`
+                          : 'Not found'
+                        }
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        <div className="flex gap-4 pt-6">
+          <Button 
+            variant="outline" 
+            onClick={onBack}
+            className="flex-1 bg-slate-700 text-white hover:bg-slate-600"
+          >
+            Back to Case Summary
+          </Button>
+          <Button 
+            onClick={() => {
+              if (multiDocumentResult) {
+                handleMultiDocumentProcessing(multiDocumentResult);
+              } else {
+                setShowDocumentUpload(false);
+                setIsAnalyzing(true);
+              }
+            }}
+            className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+          >
+            Continue to Analysis
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -200,6 +322,29 @@ export const DocumentAnalysisStep: React.FC<DocumentAnalysisStepProps> = ({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Multi-document processing summary */}
+            {multiDocumentResult && (
+              <div className="bg-slate-700 p-4 rounded-lg mb-4">
+                <p className="text-sm font-medium mb-2">Document Processing Results</p>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-400">Total Documents:</span>
+                    <span className="ml-2 font-medium">{multiDocumentResult.results.length}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Successfully Processed:</span>
+                    <span className="ml-2 font-medium text-green-400">
+                      {multiDocumentResult.results.filter(r => r.status === 'success').length}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-400">Processing Time:</span>
+                    <span className="ml-2 font-medium">{(multiDocumentResult.processingTime / 1000).toFixed(1)}s</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-gray-400">Case Strength</p>
@@ -244,10 +389,10 @@ export const DocumentAnalysisStep: React.FC<DocumentAnalysisStepProps> = ({
       <div className="flex gap-4 pt-6">
         <Button 
           variant="outline" 
-          onClick={onBack}
+          onClick={() => setShowDocumentUpload(true)}
           className="flex-1 bg-slate-700 text-white hover:bg-slate-600"
         >
-          Back to Case Summary
+          Back to Documents
         </Button>
         <Button 
           onClick={onNext}
