@@ -338,6 +338,7 @@ export const FlightDataValidationStep: React.FC<ValidationStepProps & {
   const [storageToken, setStorageToken] = React.useState<string>('');
   const [isProcessingDocument, setIsProcessingDocument] = React.useState(false);
   const [extractedData, setExtractedData] = React.useState<any>(null);
+  const [missingFields, setMissingFields] = React.useState<string[]>([]);
 
   const handleFlightDocumentUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -357,12 +358,14 @@ export const FlightDataValidationStep: React.FC<ValidationStepProps & {
       
       setFlightDocument(file);
       setExtractedData(null); // Reset extracted data when new file is uploaded
+      setMissingFields([]); // Reset missing fields
     }
   };
 
   const removeFlightDocument = () => {
     setFlightDocument(null);
     setExtractedData(null);
+    setMissingFields([]);
   };
 
   const handleProcessDocument = async () => {
@@ -377,15 +380,40 @@ export const FlightDataValidationStep: React.FC<ValidationStepProps & {
       const data = await IntegrailService.extractFlightData(flightDocument, storageToken);
       setExtractedData(data);
       
-      // Auto-fill form fields with extracted data
+      // Check for missing/null fields
+      const missing: string[] = [];
       const formattedData = IntegrailService.formatFlightDataForForm(data);
-      onInputChange('bookingReference', formattedData.bookingReference);
-      onInputChange('flightNumber', formattedData.flightNumber);
-      onInputChange('flightDate', formattedData.flightDate);
-      onInputChange('origin', formattedData.origin);
-      onInputChange('destination', formattedData.destination);
+      
+      if (!formattedData.bookingReference) missing.push('Booking Reference');
+      if (!formattedData.flightNumber) missing.push('Flight Number');
+      if (!formattedData.flightDate) missing.push('Flight Date');
+      if (!formattedData.origin) missing.push('Origin Airport');
+      if (!formattedData.destination) missing.push('Destination Airport');
+      
+      setMissingFields(missing);
+      
+      // Auto-fill only the fields that have data
+      if (formattedData.bookingReference) {
+        onInputChange('bookingReference', formattedData.bookingReference);
+      }
+      if (formattedData.flightNumber) {
+        onInputChange('flightNumber', formattedData.flightNumber);
+      }
+      if (formattedData.flightDate) {
+        onInputChange('flightDate', formattedData.flightDate);
+      }
+      if (formattedData.origin) {
+        onInputChange('origin', formattedData.origin);
+      }
+      if (formattedData.destination) {
+        onInputChange('destination', formattedData.destination);
+      }
       
       console.log('Document processed successfully:', data);
+      
+      if (missing.length > 0) {
+        console.log('Missing fields detected:', missing);
+      }
     } catch (error) {
       console.error('Document processing failed:', error);
       alert(`Failed to process document: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -396,7 +424,13 @@ export const FlightDataValidationStep: React.FC<ValidationStepProps & {
 
   const isFormComplete = () => {
     if (entryMethod === 'upload') {
-      return flightDocument !== null && extractedData !== null;
+      return flightDocument !== null && 
+             extractedData !== null && 
+             formData.bookingReference && 
+             formData.flightNumber && 
+             formData.flightDate && 
+             formData.origin && 
+             formData.destination;
     } else {
       return formData.bookingReference && 
              formData.flightNumber && 
@@ -595,6 +629,20 @@ export const FlightDataValidationStep: React.FC<ValidationStepProps & {
                         </p>
                       </div>
                     </div>
+                    
+                    {/* Missing Fields Warning */}
+                    {missingFields.length > 0 && (
+                      <Alert className="bg-yellow-900/20 border-yellow-500 mt-4">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertDescription className="text-yellow-200">
+                          <p className="font-medium mb-2">Missing Information Detected:</p>
+                          <p className="text-sm">
+                            The following fields could not be extracted from your document: {missingFields.join(', ')}.
+                            Please fill them in manually below.
+                          </p>
+                        </AlertDescription>
+                      </Alert>
+                    )}
                   </div>
                 )}
               </div>
@@ -603,69 +651,121 @@ export const FlightDataValidationStep: React.FC<ValidationStepProps & {
             <div className="bg-green-900/20 border border-green-500 rounded-lg p-3 mt-4">
               <p className="text-green-200 text-xs">
                 <strong>AI Processing:</strong> Our AI will extract flight details from your document automatically. 
-                You can review and edit the extracted information in the form fields below.
+                Any missing information must be completed manually below.
               </p>
             </div>
 
-            {/* Form fields for extracted data */}
+            {/* Form fields for extracted data - Always shown after processing */}
             {extractedData && (
               <div className="mt-6">
-                <h5 className="text-lg font-medium text-white mb-4">Review & Edit Extracted Data</h5>
+                <h5 className="text-lg font-medium text-white mb-4">
+                  {missingFields.length > 0 ? 'Complete Missing Information' : 'Review & Edit Extracted Data'}
+                </h5>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="bookingReference" className="text-gray-300 font-medium">Booking Reference</Label>
+                    <Label htmlFor="bookingReference" className="text-gray-300 font-medium">
+                      Booking Reference *
+                      {missingFields.includes('Booking Reference') && (
+                        <span className="text-red-400 ml-1">(Required - Not found in document)</span>
+                      )}
+                    </Label>
                     <Input
                       id="bookingReference"
                       value={formData.bookingReference}
                       onChange={(e) => onInputChange('bookingReference', e.target.value.toUpperCase())}
                       placeholder="ABC123"
-                      className="bg-slate-700 border-slate-600 text-white placeholder-gray-400 mt-1"
+                      className={`mt-1 ${
+                        missingFields.includes('Booking Reference') 
+                          ? 'bg-red-900/20 border-red-500 text-white placeholder-red-300' 
+                          : 'bg-slate-700 border-slate-600 text-white placeholder-gray-400'
+                      }`}
+                      required={missingFields.includes('Booking Reference')}
                     />
                   </div>
                   
                   <div>
-                    <Label htmlFor="flightNumber" className="text-gray-300 font-medium">Flight Number</Label>
+                    <Label htmlFor="flightNumber" className="text-gray-300 font-medium">
+                      Flight Number *
+                      {missingFields.includes('Flight Number') && (
+                        <span className="text-red-400 ml-1">(Required - Not found in document)</span>
+                      )}
+                    </Label>
                     <Input
                       id="flightNumber"
                       value={formData.flightNumber}
                       onChange={(e) => onInputChange('flightNumber', e.target.value.toUpperCase())}
                       placeholder="SV123"
-                      className="bg-slate-700 border-slate-600 text-white placeholder-gray-400 mt-1"
+                      className={`mt-1 ${
+                        missingFields.includes('Flight Number') 
+                          ? 'bg-red-900/20 border-red-500 text-white placeholder-red-300' 
+                          : 'bg-slate-700 border-slate-600 text-white placeholder-gray-400'
+                      }`}
+                      required={missingFields.includes('Flight Number')}
                     />
                   </div>
                   
                   <div>
-                    <Label htmlFor="flightDate" className="text-gray-300 font-medium">Flight Date</Label>
+                    <Label htmlFor="flightDate" className="text-gray-300 font-medium">
+                      Flight Date *
+                      {missingFields.includes('Flight Date') && (
+                        <span className="text-red-400 ml-1">(Required - Not found in document)</span>
+                      )}
+                    </Label>
                     <Input
                       id="flightDate"
                       type="date"
                       value={formData.flightDate}
                       onChange={(e) => onInputChange('flightDate', e.target.value)}
-                      className="bg-slate-700 border-slate-600 text-white mt-1"
+                      className={`mt-1 ${
+                        missingFields.includes('Flight Date') 
+                          ? 'bg-red-900/20 border-red-500 text-white' 
+                          : 'bg-slate-700 border-slate-600 text-white'
+                      }`}
+                      required={missingFields.includes('Flight Date')}
                     />
                   </div>
                   
                   <div>
-                    <Label htmlFor="origin" className="text-gray-300 font-medium">Origin Airport</Label>
+                    <Label htmlFor="origin" className="text-gray-300 font-medium">
+                      Origin Airport *
+                      {missingFields.includes('Origin Airport') && (
+                        <span className="text-red-400 ml-1">(Required - Not found in document)</span>
+                      )}
+                    </Label>
                     <Input
                       id="origin"
                       value={formData.origin}
                       onChange={(e) => onInputChange('origin', e.target.value.toUpperCase())}
                       placeholder="RUH"
                       maxLength={3}
-                      className="bg-slate-700 border-slate-600 text-white placeholder-gray-400 mt-1"
+                      className={`mt-1 ${
+                        missingFields.includes('Origin Airport') 
+                          ? 'bg-red-900/20 border-red-500 text-white placeholder-red-300' 
+                          : 'bg-slate-700 border-slate-600 text-white placeholder-gray-400'
+                      }`}
+                      required={missingFields.includes('Origin Airport')}
                     />
                   </div>
                   
                   <div>
-                    <Label htmlFor="destination" className="text-gray-300 font-medium">Destination Airport</Label>
+                    <Label htmlFor="destination" className="text-gray-300 font-medium">
+                      Destination Airport *
+                      {missingFields.includes('Destination Airport') && (
+                        <span className="text-red-400 ml-1">(Required - Not found in document)</span>
+                      )}
+                    </Label>
                     <Input
                       id="destination"
                       value={formData.destination}
                       onChange={(e) => onInputChange('destination', e.target.value.toUpperCase())}
                       placeholder="JED"
                       maxLength={3}
-                      className="bg-slate-700 border-slate-600 text-white placeholder-gray-400 mt-1"
+                      className={`mt-1 ${
+                        missingFields.includes('Destination Airport') 
+                          ? 'bg-red-900/20 border-red-500 text-white placeholder-red-300' 
+                          : 'bg-slate-700 border-slate-600 text-white placeholder-gray-400'
+                      }`}
+                      required={missingFields.includes('Destination Airport')}
                     />
                   </div>
                 </div>
