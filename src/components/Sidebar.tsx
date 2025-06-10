@@ -1,45 +1,80 @@
 
 import React from 'react';
-import { CheckCircle, FileText, Search, Shield, Clock } from 'lucide-react';
+import { CheckCircle, FileText, Search, Shield, Clock, User, Plane, AlertCircle, Upload } from 'lucide-react';
 
-const Sidebar = () => {
+interface SidebarProps {
+  currentStep?: number;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ currentStep = 1 }) => {
   const workflowSteps = [
     {
-      id: 'submit',
-      title: 'Submit Case',
-      subtitle: 'Identity & Details',
-      icon: FileText,
-      status: 'active'
+      id: 1,
+      title: 'Consumer Identity',
+      subtitle: 'Personal Information',
+      icon: User,
+      stepRange: [1]
     },
     {
-      id: 'eligibility',
+      id: 2,
+      title: 'Flight Data',
+      subtitle: 'Booking & Flight Details',
+      icon: Plane,
+      stepRange: [2]
+    },
+    {
+      id: 3,
+      title: 'Complaint Details',
+      subtitle: 'Issue Description',
+      icon: AlertCircle,
+      stepRange: [3]
+    },
+    {
+      id: 4,
+      title: 'Document Upload',
+      subtitle: 'Supporting Evidence',
+      icon: Upload,
+      stepRange: [4]
+    },
+    {
+      id: 5,
       title: 'Eligibility Assessment',
-      subtitle: 'GDRC Decision Tree',
+      subtitle: 'GACA Decision Tree',
       icon: CheckCircle,
-      status: 'completed'
+      stepRange: [5]
     },
     {
-      id: 'summary',
+      id: 6,
+      title: 'Consent & Authorization',
+      subtitle: 'Final Submission',
+      icon: FileText,
+      stepRange: [6]
+    },
+    {
+      id: 7,
       title: 'Case Summary & Timeline',
       subtitle: 'Legal Documentation',
       icon: Search,
-      status: 'pending'
+      stepRange: [7]
     },
     {
-      id: 'analysis',
+      id: 8,
       title: 'Document Analysis',
       subtitle: 'AI Processing',
       icon: Shield,
-      status: 'pending'
-    },
-    {
-      id: 'consent',
-      title: 'Consent & Completion',
-      subtitle: 'Final Submission',
-      icon: CheckCircle,
-      status: 'completed'
+      stepRange: [8]
     }
   ];
+
+  const getStepStatus = (step: typeof workflowSteps[0]) => {
+    if (step.stepRange.includes(currentStep)) {
+      return 'active';
+    } else if (step.stepRange.some(range => range < currentStep)) {
+      return 'completed';
+    } else {
+      return 'pending';
+    }
+  };
 
   return (
     <div className="w-80 bg-slate-900 text-white min-h-screen p-6">
@@ -65,11 +100,13 @@ const Sidebar = () => {
         <div className="space-y-3">
           {workflowSteps.map((step, index) => {
             const Icon = step.icon;
+            const status = getStepStatus(step);
+            
             return (
               <div key={step.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors">
                 <div className={`p-2 rounded-lg ${
-                  step.status === 'active' ? 'bg-blue-600' : 
-                  step.status === 'completed' ? 'bg-green-600' : 
+                  status === 'active' ? 'bg-blue-600' : 
+                  status === 'completed' ? 'bg-green-600' : 
                   'bg-gray-600'
                 }`}>
                   <Icon className="w-4 h-4" />
@@ -78,9 +115,28 @@ const Sidebar = () => {
                   <h3 className="text-sm font-medium">{step.title}</h3>
                   <p className="text-xs text-gray-400">{step.subtitle}</p>
                 </div>
+                <div className="text-xs text-gray-500">
+                  {step.stepRange.join('-')}
+                </div>
               </div>
             );
           })}
+        </div>
+      </div>
+
+      <div className="mt-8 p-4 bg-slate-800 rounded-lg">
+        <div className="flex items-center gap-2 mb-2">
+          <Clock className="h-4 w-4 text-blue-400" />
+          <span className="text-sm font-medium">Current Progress</span>
+        </div>
+        <div className="text-xs text-gray-400">
+          Step {currentStep} of 8 completed
+        </div>
+        <div className="mt-2 bg-slate-700 rounded-full h-2">
+          <div 
+            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+            style={{ width: `${(currentStep / 8) * 100}%` }}
+          />
         </div>
       </div>
     </div>

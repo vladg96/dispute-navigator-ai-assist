@@ -19,6 +19,8 @@ import {
   ComplaintDetailsStep,
   DocumentUploadStep
 } from './ValidationSteps';
+import { CaseSummaryStep } from './CaseSummaryStep';
+import { DocumentAnalysisStep } from './DocumentAnalysisStep';
 import { Info, AlertTriangle, CheckCircle, X, Clock } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -49,7 +51,7 @@ const DisputeForm = () => {
   const [isValidating, setIsValidating] = useState(false);
   const [isCheckingEligibility, setIsCheckingEligibility] = useState(false);
 
-  const totalSteps = 4;
+  const totalSteps = 4; // Keep original validation steps count
 
   const handleInputChange = (field: keyof DisputeFormData, value: string | boolean) => {
     setFormData(prev => ({
@@ -159,7 +161,7 @@ const DisputeForm = () => {
         setCurrentStep(prev => prev + 1);
       });
     } else {
-      // Final step - proceed to eligibility check
+      // Final validation step - proceed to eligibility check
       handleStepValidation(currentStep, () => {
         handleCheckEligibility();
       });
@@ -225,6 +227,9 @@ const DisputeForm = () => {
       status: 'Under Review',
       timestamp: new Date().toISOString()
     });
+
+    // Navigate to case summary after consent
+    setCurrentStep(7);
   };
 
   const renderValidationSteps = () => {
@@ -390,12 +395,35 @@ const DisputeForm = () => {
 
   return (
     <div className="flex min-h-screen bg-slate-900">
-      <Sidebar />
+      <Sidebar currentStep={currentStep} />
       
       <div className="flex-1 p-8">
         {currentStep <= totalSteps && renderValidationSteps()}
         {currentStep === 5 && renderEligibilityCheck()}
         {currentStep === 6 && renderFinalConsent()}
+        {currentStep === 7 && (
+          <CaseSummaryStep
+            formData={formData}
+            onNext={() => setCurrentStep(8)}
+            onBack={() => setCurrentStep(6)}
+            stepNumber={7}
+            totalSteps={8}
+          />
+        )}
+        {currentStep === 8 && (
+          <DocumentAnalysisStep
+            formData={formData}
+            onNext={() => {
+              toast({
+                title: "Analysis Complete",
+                description: "Your dispute case has been fully processed and submitted.",
+              });
+            }}
+            onBack={() => setCurrentStep(7)}
+            stepNumber={8}
+            totalSteps={8}
+          />
+        )}
       </div>
     </div>
   );
