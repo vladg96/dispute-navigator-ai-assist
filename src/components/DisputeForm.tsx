@@ -79,43 +79,56 @@ const DisputeForm = () => {
     }
   };
 
-  const handleStepValidation = (stepNumber: number, onSuccess?: () => void) => {
-    let validationResult: StepValidationResult;
+  const handleStepValidation = async (stepNumber: number, onSuccess?: () => void) => {
+    setIsValidating(true);
+    
+    try {
+      let validationResult: StepValidationResult;
 
-    switch (stepNumber) {
-      case 1:
-        validationResult = validateConsumerIdentity(formData);
-        break;
-      case 2:
-        validationResult = validateFlightData(formData);
-        break;
-      case 3:
-        validationResult = validateComplaintDetails(formData);
-        break;
-      case 4:
-        validationResult = validateDocuments(formData);
-        break;
-      default:
-        return;
-    }
+      switch (stepNumber) {
+        case 1:
+          validationResult = await validateConsumerIdentity(formData);
+          break;
+        case 2:
+          validationResult = validateFlightData(formData);
+          break;
+        case 3:
+          validationResult = validateComplaintDetails(formData);
+          break;
+        case 4:
+          validationResult = validateDocuments(formData);
+          break;
+        default:
+          return;
+      }
 
-    setValidationResults(prev => ({
-      ...prev,
-      [stepNumber]: validationResult
-    }));
+      setValidationResults(prev => ({
+        ...prev,
+        [stepNumber]: validationResult
+      }));
 
-    if (validationResult.isValid) {
-      onSuccess?.();
-      toast({
-        title: "Validation Successful",
-        description: `Step ${stepNumber} validation completed successfully.`,
-      });
-    } else {
+      if (validationResult.isValid) {
+        onSuccess?.();
+        toast({
+          title: "Validation Successful",
+          description: `Step ${stepNumber} validation completed successfully.`,
+        });
+      } else {
+        toast({
+          title: "Validation Error",
+          description: "Please correct the errors below",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Validation error:', error);
       toast({
         title: "Validation Error",
-        description: "Please correct the errors below",
+        description: "An error occurred during validation. Please try again.",
         variant: "destructive"
       });
+    } finally {
+      setIsValidating(false);
     }
   };
 
@@ -255,7 +268,7 @@ const DisputeForm = () => {
 
     switch (currentStep) {
       case 1:
-        return <IdentityValidationStep {...commonProps} />;
+        return <IdentityValidationStep {...commonProps} isValidating={isValidating} />;
       case 2:
         return (
           <FlightDataValidationStep 
