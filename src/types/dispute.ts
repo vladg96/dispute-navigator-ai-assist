@@ -20,6 +20,12 @@ export interface ValidationResult {
   errors: string[];
 }
 
+export interface StepValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings?: string[];
+}
+
 export interface EligibilityResult {
   status: 'eligible' | 'invalid' | 'hold';
   message: string;

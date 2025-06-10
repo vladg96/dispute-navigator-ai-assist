@@ -1,16 +1,27 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { validateDisputeForm, checkEligibility } from '@/utils/disputeValidation';
-import { DisputeFormData, ValidationResult, EligibilityResult } from '@/types/dispute';
-import { Info, AlertTriangle, CheckCircle, X, Shield } from 'lucide-react';
+import { checkEligibility } from '@/utils/disputeValidation';
+import { 
+  validateConsumerIdentity, 
+  validateFlightData, 
+  validateComplaintDetails, 
+  validateDocuments,
+  verifyBookingReference 
+} from '@/utils/validationSteps';
+import { DisputeFormData, StepValidationResult, EligibilityResult } from '@/types/dispute';
+import { 
+  IdentityValidationStep,
+  FlightDataValidationStep,
+  ComplaintDetailsStep,
+  DocumentUploadStep
+} from './ValidationSteps';
+import { Info, AlertTriangle, CheckCircle, X, Clock } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import Sidebar from './Sidebar';
 
 const DisputeForm = () => {
@@ -31,19 +42,14 @@ const DisputeForm = () => {
     consentGiven: false
   });
 
-  const [validationErrors, setValidationErrors] = useState<string[]>([]);
-  const [eligibilityResult, setEligibilityResult] = useState<EligibilityResult | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [validationResults, setValidationResults] = useState<Record<number, StepValidationResult>>({});
+  const [bookingVerificationResult, setBookingVerificationResult] = useState<any>(null);
+  const [eligibilityResult, setEligibilityResult] = useState<EligibilityResult | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
+  const [isCheckingEligibility, setIsCheckingEligibility] = useState(false);
 
-  const disputeCategories = [
-    'Flight Delay (> 3 hours)',
-    'Cancellation without 14 days notice',
-    'Lost/damaged baggage',
-    'Denied boarding/reaccommodation',
-    'Refund Request',
-    'Other'
-  ];
+  const totalSteps = 4;
 
   const handleInputChange = (field: keyof DisputeFormData, value: string | boolean) => {
     setFormData(prev => ({
@@ -51,37 +57,131 @@ const DisputeForm = () => {
       [field]: value
     }));
     
-    if (validationErrors.length > 0) {
-      setValidationErrors([]);
+    // Clear validation results when user starts editing
+    if (validationResults[currentStep]) {
+      setValidationResults(prev => {
+        const newResults = { ...prev };
+        delete newResults[currentStep];
+        return newResults;
+      });
     }
   };
 
-  const handleValidateStep1 = () => {
-    const validation = validateDisputeForm(formData);
-    
-    if (!validation.isValid) {
-      setValidationErrors(validation.errors);
+  const handleStepValidation = (stepNumber: number, onSuccess?: () => void) => {
+    let validationResult: StepValidationResult;
+
+    switch (stepNumber) {
+      case 1:
+        validationResult = validateConsumerIdentity(formData);
+        break;
+      case 2:
+        validationResult = validateFlightData(formData);
+        break;
+      case 3:
+        validationResult = validateComplaintDetails(formData);
+        break;
+      case 4:
+        validationResult = validateDocuments(formData);
+        break;
+      default:
+        return;
+    }
+
+    setValidationResults(prev => ({
+      ...prev,
+      [stepNumber]: validationResult
+    }));
+
+    if (validationResult.isValid) {
+      onSuccess?.();
+      toast({
+        title: "Validation Successful",
+        description: `Step ${stepNumber} validation completed successfully.`,
+      });
+    } else {
       toast({
         title: "Validation Error",
         description: "Please correct the errors below",
         variant: "destructive"
       });
+    }
+  };
+
+  const handleVerifyBooking = async () => {
+    if (!formData.bookingReference || formData.bookingReference.length !== 6) {
+      toast({
+        title: "Invalid Booking Reference",
+        description: "Please enter a valid 6-character booking reference",
+        variant: "destructive"
+      });
       return;
     }
 
-    setCurrentStep(2);
-    setValidationErrors([]);
+    setIsValidating(true);
+    try {
+      const result = await verifyBookingReference(formData.bookingReference);
+      setBookingVerificationResult(result);
+      
+      if (result.exists) {
+        toast({
+          title: "Booking Verified",
+          description: "Your booking reference has been successfully verified.",
+        });
+      } else {
+        toast({
+          title: "Booking Not Found",
+          description: result.message,
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Verification Error",
+        description: "Failed to verify booking reference. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const handleNext = () => {
+    if (currentStep < totalSteps) {
+      handleStepValidation(currentStep, () => {
+        if (currentStep === 2 && !bookingVerificationResult?.exists) {
+          toast({
+            title: "Booking Verification Required",
+            description: "Please verify your booking reference before proceeding.",
+            variant: "destructive"
+          });
+          return;
+        }
+        setCurrentStep(prev => prev + 1);
+      });
+    } else {
+      // Final step - proceed to eligibility check
+      handleStepValidation(currentStep, () => {
+        handleCheckEligibility();
+      });
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 1) {
+      setCurrentStep(prev => prev - 1);
+    }
   };
 
   const handleCheckEligibility = () => {
-    setIsSubmitting(true);
+    setIsCheckingEligibility(true);
+    setCurrentStep(5); // Move to eligibility check step
     
     setTimeout(() => {
       const eligibility = checkEligibility(formData);
       setEligibilityResult(eligibility);
       
       if (eligibility.status === 'eligible') {
-        setCurrentStep(3);
+        setCurrentStep(6); // Move to final consent step
         toast({
           title: "Eligible for Processing",
           description: "Your dispute meets all requirements and will be processed.",
@@ -94,8 +194,8 @@ const DisputeForm = () => {
         });
       }
       
-      setIsSubmitting(false);
-    }, 1500);
+      setIsCheckingEligibility(false);
+    }, 2000);
   };
 
   const handleFinalSubmit = () => {
@@ -108,13 +208,15 @@ const DisputeForm = () => {
       return;
     }
 
+    const caseId = `CS-2025-${Date.now().toString().slice(-6)}`;
+    
     toast({
       title: "Dispute Submitted Successfully",
-      description: `Case ID: CS-2025-${Date.now().toString().slice(-6)}`,
+      description: `Case ID: ${caseId}`,
     });
 
     console.log('Case Summary Generated:', {
-      caseId: `CS-2025-${Date.now().toString().slice(-6)}`,
+      caseId,
       consumerName: formData.consumerName,
       bookingReference: formData.bookingReference,
       flightDetails: `${formData.flightNumber}, ${formData.flightDate}`,
@@ -125,282 +227,128 @@ const DisputeForm = () => {
     });
   };
 
-  const renderValidationErrors = () => {
-    if (validationErrors.length === 0) return null;
+  const renderValidationSteps = () => {
+    const commonProps = {
+      formData,
+      onInputChange: handleInputChange,
+      onNext: handleNext,
+      onBack: currentStep > 1 ? handleBack : undefined,
+      validationResult: validationResults[currentStep],
+      stepNumber: currentStep,
+      totalSteps
+    };
 
-    return (
-      <Alert variant="destructive" className="mb-4 bg-red-900/20 border-red-500">
-        <AlertTriangle className="h-4 w-4" />
-        <AlertDescription className="text-red-200">
-          <ul className="list-disc list-inside space-y-1">
-            {validationErrors.map((error, index) => (
-              <li key={index}>{error}</li>
-            ))}
-          </ul>
-        </AlertDescription>
-      </Alert>
-    );
+    switch (currentStep) {
+      case 1:
+        return <IdentityValidationStep {...commonProps} />;
+      case 2:
+        return (
+          <FlightDataValidationStep 
+            {...commonProps}
+            onVerifyBooking={handleVerifyBooking}
+            bookingVerificationResult={bookingVerificationResult}
+            isValidating={isValidating}
+          />
+        );
+      case 3:
+        return <ComplaintDetailsStep {...commonProps} />;
+      case 4:
+        return <DocumentUploadStep {...commonProps} />;
+      default:
+        return null;
+    }
   };
 
-  const renderStep1 = () => (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-2xl font-semibold text-white mb-2">Submit Dispute Case</h2>
-        <p className="text-gray-400">Verify your identity and provide dispute information</p>
-      </div>
-
-      <div className="bg-slate-800 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-white mb-6">Step 1: Consumer Identity Verification</h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <Label htmlFor="consumerName" className="text-gray-300 font-medium">Full Name *</Label>
-            <Input
-              id="consumerName"
-              value={formData.consumerName}
-              onChange={(e) => handleInputChange('consumerName', e.target.value)}
-              placeholder="Enter full name"
-              className="bg-slate-700 border-slate-600 text-white placeholder-gray-400 mt-2"
-            />
-          </div>
-          
-          <div>
-            <Label htmlFor="nationalId" className="text-gray-300 font-medium">ID/Passport Number *</Label>
-            <Input
-              id="nationalId"
-              value={formData.nationalId}
-              onChange={(e) => handleInputChange('nationalId', e.target.value)}
-              placeholder="Enter ID or passport number"
-              className="bg-slate-700 border-slate-600 text-white placeholder-gray-400 mt-2"
-            />
-          </div>
-          
-          <div>
-            <Label htmlFor="phone" className="text-gray-300 font-medium">Phone Number *</Label>
-            <Input
-              id="phone"
-              type="tel"
-              value={formData.phone}
-              onChange={(e) => handleInputChange('phone', e.target.value)}
-              placeholder="+966xxxxxxxxxx"
-              className="bg-slate-700 border-slate-600 text-white placeholder-gray-400 mt-2"
-            />
-          </div>
-          
-          <div>
-            <Label htmlFor="email" className="text-gray-300 font-medium">Email Address *</Label>
-            <Input
-              id="email"
-              type="email"
-              value={formData.email}
-              onChange={(e) => handleInputChange('email', e.target.value)}
-              placeholder="email@example.com"
-              className="bg-slate-700 border-slate-600 text-white placeholder-gray-400 mt-2"
-            />
-          </div>
-        </div>
-
-        <div className="mt-8 space-y-6">
-          <h4 className="text-lg font-medium text-white">Flight & Booking Details</h4>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <Label htmlFor="bookingReference" className="text-gray-300 font-medium">Booking Reference *</Label>
-              <Input
-                id="bookingReference"
-                value={formData.bookingReference}
-                onChange={(e) => handleInputChange('bookingReference', e.target.value.toUpperCase())}
-                placeholder="ABC123"
-                maxLength={6}
-                className="bg-slate-700 border-slate-600 text-white placeholder-gray-400 mt-2"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="flightNumber" className="text-gray-300 font-medium">Flight Number *</Label>
-              <Input
-                id="flightNumber"
-                value={formData.flightNumber}
-                onChange={(e) => handleInputChange('flightNumber', e.target.value.toUpperCase())}
-                placeholder="SV123"
-                className="bg-slate-700 border-slate-600 text-white placeholder-gray-400 mt-2"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="flightDate" className="text-gray-300 font-medium">Flight Date *</Label>
-              <Input
-                id="flightDate"
-                type="date"
-                value={formData.flightDate}
-                onChange={(e) => handleInputChange('flightDate', e.target.value)}
-                className="bg-slate-700 border-slate-600 text-white mt-2"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="origin" className="text-gray-300 font-medium">Origin Airport *</Label>
-              <Input
-                id="origin"
-                value={formData.origin}
-                onChange={(e) => handleInputChange('origin', e.target.value.toUpperCase())}
-                placeholder="RUH"
-                maxLength={3}
-                className="bg-slate-700 border-slate-600 text-white placeholder-gray-400 mt-2"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="destination" className="text-gray-300 font-medium">Destination Airport *</Label>
-              <Input
-                id="destination"
-                value={formData.destination}
-                onChange={(e) => handleInputChange('destination', e.target.value.toUpperCase())}
-                placeholder="JED"
-                maxLength={3}
-                className="bg-slate-700 border-slate-600 text-white placeholder-gray-400 mt-2"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="disputeCategory" className="text-gray-300 font-medium">Dispute Category *</Label>
-              <Select
-                value={formData.disputeCategory}
-                onValueChange={(value) => handleInputChange('disputeCategory', value)}
-              >
-                <SelectTrigger className="bg-slate-700 border-slate-600 text-white mt-2">
-                  <SelectValue placeholder="Select dispute category" />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-700 border-slate-600">
-                  {disputeCategories.map((category) => (
-                    <SelectItem key={category} value={category} className="text-white hover:bg-slate-600">
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          
-          <div>
-            <Label htmlFor="description" className="text-gray-300 font-medium">Description</Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={(e) => handleInputChange('description', e.target.value)}
-              placeholder="Please describe your issue in detail..."
-              rows={4}
-              className="bg-slate-700 border-slate-600 text-white placeholder-gray-400 mt-2"
-            />
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="hasDocuments"
-              checked={formData.hasDocuments}
-              onCheckedChange={(checked) => handleInputChange('hasDocuments', checked as boolean)}
-              className="border-slate-600"
-            />
-            <Label htmlFor="hasDocuments" className="text-gray-300">
-              I have supporting documents (boarding pass, receipts, etc.)
-            </Label>
-          </div>
-        </div>
-
-        {renderValidationErrors()}
-
-        <div className="mt-8 flex justify-center">
-          <Button 
-            onClick={handleValidateStep1} 
-            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-medium flex items-center gap-2"
-          >
-            <Shield className="w-4 h-4" />
-            Verify Identity & Continue
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderStep2 = () => (
+  const renderEligibilityCheck = () => (
     <div className="space-y-6">
       <div className="text-center">
-        <h3 className="text-lg font-semibold mb-4 text-white">Checking Eligibility...</h3>
-        
-        {eligibilityResult && (
-          <Card className="p-6 bg-slate-800 border-slate-700 text-white">
-            <div className="flex items-center justify-center mb-4">
-              {eligibilityResult.status === 'eligible' && (
-                <CheckCircle className="h-12 w-12 text-green-500" />
-              )}
-              {eligibilityResult.status === 'invalid' && (
-                <X className="h-12 w-12 text-red-500" />
-              )}
-              {eligibilityResult.status === 'hold' && (
-                <Info className="h-12 w-12 text-yellow-500" />
-              )}
-            </div>
-            
-            <h4 className="text-xl font-semibold mb-2">
-              {eligibilityResult.status === 'eligible' && 'Eligible for Processing'}
-              {eligibilityResult.status === 'invalid' && 'Invalid Submission'}
-              {eligibilityResult.status === 'hold' && 'Additional Documents Required'}
-            </h4>
-            
-            <p className="text-gray-400 mb-4">{eligibilityResult.message}</p>
-            
-            {eligibilityResult.details && eligibilityResult.details.length > 0 && (
-              <div className="text-left">
-                <h5 className="font-medium mb-2">Details:</h5>
-                <ul className="list-disc list-inside space-y-1 text-sm text-gray-300">
-                  {eligibilityResult.details.map((detail, index) => (
-                    <li key={index}>{detail}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </Card>
-        )}
+        <Clock className="h-16 w-16 text-blue-500 mx-auto mb-4 animate-spin" />
+        <h3 className="text-2xl font-semibold mb-2 text-white">
+          {isCheckingEligibility ? 'Checking Eligibility...' : 'Eligibility Assessment Complete'}
+        </h3>
+        <p className="text-gray-400 mb-6">
+          {isCheckingEligibility 
+            ? 'Running validation against GACA regulations and airline policies...'
+            : 'Your dispute has been assessed for eligibility'
+          }
+        </p>
       </div>
 
-      <div className="flex gap-4">
-        <Button variant="outline" onClick={() => setCurrentStep(1)} className="flex-1 bg-slate-700 text-white hover:bg-slate-600">
-          Back to Form
-        </Button>
-        
-        {!eligibilityResult && (
-          <Button onClick={handleCheckEligibility} disabled={isSubmitting} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white">
-            {isSubmitting ? 'Checking...' : 'Check Eligibility'}
-          </Button>
-        )}
-        
-        {eligibilityResult?.status === 'invalid' && (
-          <Button variant="outline" onClick={() => setCurrentStep(1)} className="flex-1 bg-slate-700 text-white hover:bg-slate-600">
-            Correct Issues
-          </Button>
-        )}
-      </div>
+      {eligibilityResult && !isCheckingEligibility && (
+        <Card className="p-6 bg-slate-800 border-slate-700 text-white">
+          <div className="flex items-center justify-center mb-4">
+            {eligibilityResult.status === 'eligible' && (
+              <CheckCircle className="h-12 w-12 text-green-500" />
+            )}
+            {eligibilityResult.status === 'invalid' && (
+              <X className="h-12 w-12 text-red-500" />
+            )}
+            {eligibilityResult.status === 'hold' && (
+              <Info className="h-12 w-12 text-yellow-500" />
+            )}
+          </div>
+          
+          <h4 className="text-xl font-semibold mb-2 text-center">
+            {eligibilityResult.status === 'eligible' && 'Eligible for Processing'}
+            {eligibilityResult.status === 'invalid' && 'Invalid Submission'}
+            {eligibilityResult.status === 'hold' && 'On Hold - Additional Documents Required'}
+          </h4>
+          
+          <p className="text-gray-400 mb-4 text-center">{eligibilityResult.message}</p>
+          
+          {eligibilityResult.details && eligibilityResult.details.length > 0 && (
+            <div className="bg-slate-700 rounded-lg p-4">
+              <h5 className="font-medium mb-2">Details:</h5>
+              <ul className="list-disc list-inside space-y-1 text-sm text-gray-300">
+                {eligibilityResult.details.map((detail, index) => (
+                  <li key={index}>{detail}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="flex gap-4 mt-6">
+            <Button 
+              variant="outline" 
+              onClick={() => setCurrentStep(1)} 
+              className="flex-1 bg-slate-700 text-white hover:bg-slate-600"
+            >
+              Back to Form
+            </Button>
+            
+            {eligibilityResult.status === 'eligible' && (
+              <Button 
+                onClick={() => setCurrentStep(6)}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+              >
+                Proceed to Consent
+              </Button>
+            )}
+          </div>
+        </Card>
+      )}
     </div>
   );
 
-  const renderStep3 = () => (
+  const renderFinalConsent = () => (
     <div className="space-y-6">
       <div className="text-center">
         <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-        <h3 className="text-2xl font-semibold mb-2 text-white">Dispute Eligible</h3>
+        <h3 className="text-2xl font-semibold mb-2 text-white">Final Consent & Submission</h3>
         <p className="text-gray-400 mb-6">
-          Your dispute meets all requirements and can be processed.
+          Your dispute has been validated and is ready for submission.
         </p>
       </div>
 
       <Card className="p-6 bg-slate-800 border-slate-700 text-white">
-        <h4 className="font-semibold mb-4">Consent & Authorization</h4>
+        <h4 className="font-semibold mb-4">Consumer Consent & Authorization</h4>
         
         <div className="bg-yellow-900/20 border border-yellow-500 rounded-lg p-4 mb-4">
           <p className="text-sm text-yellow-300">
             "I, <strong>{formData.consumerName}</strong>, have reviewed all the facts, timeline, and regulatory 
-            references related to my dispute. I understand the proposed resolution (refund/compensation) 
-            and agree to accept it under GACA regulations. I hereby authorize processing of my claim."
+            references related to my dispute. I understand that my case will be processed under GACA regulations 
+            and airline consumer protection policies. I hereby authorize the processing of my dispute claim and 
+            agree to the terms and conditions of the dispute resolution process."
           </p>
         </div>
         
@@ -416,23 +364,27 @@ const DisputeForm = () => {
           </Label>
         </div>
         
-        <p className="text-xs text-gray-400 mb-4">
-          Date: {new Date().toLocaleDateString()} | Signature: Electronic Consent
+        <p className="text-xs text-gray-400 mb-6">
+          Date: {new Date().toLocaleDateString()} | Electronic Consent Timestamp: {new Date().toISOString()}
         </p>
-      </Card>
 
-      <div className="flex gap-4">
-        <Button variant="outline" onClick={() => setCurrentStep(2)} className="flex-1 bg-slate-700 text-white hover:bg-slate-600">
-          Back
-        </Button>
-        <Button 
-          onClick={handleFinalSubmit} 
-          disabled={!formData.consentGiven}
-          className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-        >
-          Submit Dispute
-        </Button>
-      </div>
+        <div className="flex gap-4">
+          <Button 
+            variant="outline" 
+            onClick={() => setCurrentStep(5)} 
+            className="flex-1 bg-slate-700 text-white hover:bg-slate-600"
+          >
+            Back to Eligibility
+          </Button>
+          <Button 
+            onClick={handleFinalSubmit} 
+            disabled={!formData.consentGiven}
+            className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+          >
+            Submit Dispute Case
+          </Button>
+        </div>
+      </Card>
     </div>
   );
 
@@ -441,9 +393,9 @@ const DisputeForm = () => {
       <Sidebar />
       
       <div className="flex-1 p-8">
-        {currentStep === 1 && renderStep1()}
-        {currentStep === 2 && renderStep2()}
-        {currentStep === 3 && renderStep3()}
+        {currentStep <= totalSteps && renderValidationSteps()}
+        {currentStep === 5 && renderEligibilityCheck()}
+        {currentStep === 6 && renderFinalConsent()}
       </div>
     </div>
   );
