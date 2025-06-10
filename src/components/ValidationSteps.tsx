@@ -8,11 +8,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card } from '@/components/ui/card';
 import { DisputeFormData, StepValidationResult } from '@/types/dispute';
-import { CheckCircle, AlertTriangle, Info, Loader2, Shield, UserCheck, AlertCircle } from 'lucide-react';
+import { CheckCircle, AlertTriangle, Info, Loader2, Shield, UserCheck, AlertCircle, Upload, X } from 'lucide-react';
 
 interface ValidationStepProps {
   formData: DisputeFormData;
-  onInputChange: (field: keyof DisputeFormData, value: string | boolean) => void;
+  onInputChange: (field: keyof DisputeFormData, value: string | boolean | File | null) => void;
   onNext: () => void;
   onBack?: () => void;
   validationResult?: StepValidationResult;
@@ -31,6 +31,30 @@ export const IdentityValidationStep: React.FC<ValidationStepProps> = ({
   stepNumber,
   totalSteps
 }) => {
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      if (!allowedTypes.includes(file.type)) {
+        alert('Please upload a valid image file (JPEG, PNG, or WebP)');
+        return;
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size must be less than 5MB');
+        return;
+      }
+      
+      onInputChange('idPhoto', file);
+    }
+  };
+
+  const removeFile = () => {
+    onInputChange('idPhoto', null);
+  };
+
   const renderEverworkerResults = () => {
     if (!validationResult?.everworkerResult) return null;
 
@@ -155,6 +179,72 @@ export const IdentityValidationStep: React.FC<ValidationStepProps> = ({
           </div>
         </div>
 
+        {/* ID Photo Upload Section */}
+        <div className="mt-8">
+          <Label className="text-gray-300 font-medium">ID Photo Upload *</Label>
+          <p className="text-sm text-gray-400 mt-1 mb-4">
+            Please upload a clear photo of your National ID or Passport for verification
+          </p>
+          
+          {!formData.idPhoto ? (
+            <div className="border-2 border-dashed border-slate-600 rounded-lg p-6 text-center">
+              <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-400 mb-4">
+                <span className="font-medium">Click to upload</span> or drag and drop
+              </p>
+              <p className="text-xs text-gray-500 mb-4">
+                Supported formats: JPEG, PNG, WebP (Max 5MB)
+              </p>
+              <input
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                onChange={handleFileUpload}
+                className="hidden"
+                id="idPhotoUpload"
+              />
+              <Button 
+                type="button"
+                onClick={() => document.getElementById('idPhotoUpload')?.click()}
+                variant="outline"
+                className="bg-slate-700 text-white hover:bg-slate-600"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Choose ID Photo
+              </Button>
+            </div>
+          ) : (
+            <div className="bg-slate-700 rounded-lg p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="bg-green-600 rounded-lg p-2">
+                  <CheckCircle className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-white font-medium">{formData.idPhoto.name}</p>
+                  <p className="text-xs text-gray-400">
+                    {(formData.idPhoto.size / 1024 / 1024).toFixed(2)} MB
+                  </p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                onClick={removeFile}
+                variant="ghost"
+                size="sm"
+                className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+          
+          <div className="bg-blue-900/20 border border-blue-500 rounded-lg p-3 mt-4">
+            <p className="text-blue-200 text-xs">
+              <strong>Privacy Notice:</strong> Your ID photo is used solely for identity verification 
+              and will be processed securely according to GACA data protection standards.
+            </p>
+          </div>
+        </div>
+
         {/* Validation Loading State */}
         {isValidating && (
           <div className="mt-6">
@@ -207,7 +297,7 @@ export const IdentityValidationStep: React.FC<ValidationStepProps> = ({
         <div className="mt-8 flex justify-center">
           <Button 
             onClick={onNext}
-            disabled={isValidating}
+            disabled={isValidating || !formData.idPhoto}
             className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3"
           >
             {isValidating ? (

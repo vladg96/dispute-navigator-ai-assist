@@ -1,3 +1,4 @@
+
 import { DisputeFormData, EverworkerValidationResult } from '@/types/dispute';
 import { EverworkerService } from '@/services/everworkerService';
 
@@ -38,6 +39,22 @@ export const validateConsumerIdentity = async (formData: Partial<DisputeFormData
     errors.push("Email address is required");
   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
     errors.push("Please enter a valid email address");
+  }
+
+  // ID Photo validation
+  if (!formData.idPhoto) {
+    errors.push("ID photo is required for identity verification");
+  } else {
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(formData.idPhoto.type)) {
+      errors.push("ID photo must be a valid image file (JPEG, PNG, or WebP)");
+    }
+    
+    // Validate file size (max 5MB)
+    if (formData.idPhoto.size > 5 * 1024 * 1024) {
+      errors.push("ID photo file size must be less than 5MB");
+    }
   }
 
   // If basic validation passes, proceed with Everworker validation

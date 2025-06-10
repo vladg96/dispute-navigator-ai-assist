@@ -4,6 +4,7 @@ export interface DisputeFormData {
   nationalId: string;
   phone: string;
   email: string;
+  idPhoto: File | null;
   bookingReference: string;
   flightNumber: string;
   flightDate: string;

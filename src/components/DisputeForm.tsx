@@ -32,6 +32,7 @@ const DisputeForm = () => {
     nationalId: '',
     phone: '',
     email: '',
+    idPhoto: null,
     bookingReference: '',
     flightNumber: '',
     flightDate: '',
@@ -52,7 +53,7 @@ const DisputeForm = () => {
 
   const totalSteps = 4; // Keep original validation steps count
 
-  const handleInputChange = (field: keyof DisputeFormData, value: string | boolean) => {
+  const handleInputChange = (field: keyof DisputeFormData, value: string | boolean | File | null) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
