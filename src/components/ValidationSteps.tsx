@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -335,7 +334,6 @@ export const FlightDataValidationStep: React.FC<ValidationStepProps & {
 }) => {
   const [flightDocument, setFlightDocument] = React.useState<File | null>(null);
   const [entryMethod, setEntryMethod] = React.useState<'upload' | 'manual'>('upload');
-  const [storageToken, setStorageToken] = React.useState<string>('');
   const [isProcessingDocument, setIsProcessingDocument] = React.useState(false);
   const [extractedData, setExtractedData] = React.useState<any>(null);
   const [missingFields, setMissingFields] = React.useState<string[]>([]);
@@ -369,15 +367,15 @@ export const FlightDataValidationStep: React.FC<ValidationStepProps & {
   };
 
   const handleProcessDocument = async () => {
-    if (!flightDocument || !storageToken.trim()) {
-      alert('Please upload a document and provide a storage token');
+    if (!flightDocument) {
+      alert('Please upload a document first');
       return;
     }
 
     setIsProcessingDocument(true);
     try {
       console.log('Starting document processing...');
-      const data = await IntegrailService.extractFlightData(flightDocument, storageToken);
+      const data = await IntegrailService.extractFlightData(flightDocument);
       setExtractedData(data);
       
       // Check for missing/null fields
@@ -505,22 +503,6 @@ export const FlightDataValidationStep: React.FC<ValidationStepProps & {
         {entryMethod === 'upload' ? (
           // Document Upload Section
           <div>
-            {/* Storage Token Input */}
-            <div className="mb-6">
-              <Label htmlFor="storageToken" className="text-gray-300 font-medium">Storage Access Token *</Label>
-              <p className="text-sm text-gray-400 mt-1 mb-2">
-                Please provide your Integrail storage token for secure document processing
-              </p>
-              <Input
-                id="storageToken"
-                type="password"
-                value={storageToken}
-                onChange={(e) => setStorageToken(e.target.value)}
-                placeholder="Enter your storage token"
-                className="bg-slate-700 border-slate-600 text-white placeholder-gray-400"
-              />
-            </div>
-
             <Label className="text-gray-300 font-medium">Boarding Pass / Flight Receipt *</Label>
             <p className="text-sm text-gray-400 mt-1 mb-4">
               Upload your boarding pass or flight receipt - we'll auto-extract the flight details
@@ -582,7 +564,7 @@ export const FlightDataValidationStep: React.FC<ValidationStepProps & {
                   <Button
                     type="button"
                     onClick={handleProcessDocument}
-                    disabled={isProcessingDocument || !storageToken.trim()}
+                    disabled={isProcessingDocument}
                     className="w-full bg-purple-600 hover:bg-purple-700 text-white"
                   >
                     {isProcessingDocument ? (
