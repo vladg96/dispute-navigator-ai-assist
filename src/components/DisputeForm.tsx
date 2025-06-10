@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -65,6 +64,17 @@ const DisputeForm = () => {
         const newResults = { ...prev };
         delete newResults[currentStep];
         return newResults;
+      });
+    }
+  };
+
+  const handleStepClick = (stepNumber: number) => {
+    // Only allow navigation to steps that have been reached or are current
+    if (stepNumber <= Math.max(currentStep, 8)) {
+      setCurrentStep(stepNumber);
+      toast({
+        title: "Navigation",
+        description: `Switched to step ${stepNumber}`,
       });
     }
   };
@@ -395,7 +405,7 @@ const DisputeForm = () => {
 
   return (
     <div className="flex min-h-screen bg-slate-900">
-      <Sidebar currentStep={currentStep} />
+      <Sidebar currentStep={currentStep} onStepClick={handleStepClick} />
       
       <div className="flex-1 p-8">
         {currentStep <= totalSteps && renderValidationSteps()}

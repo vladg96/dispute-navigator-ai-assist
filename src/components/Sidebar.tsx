@@ -1,12 +1,12 @@
-
 import React from 'react';
 import { CheckCircle, FileText, Search, Shield, Clock, User, Plane, AlertCircle, Upload } from 'lucide-react';
 
 interface SidebarProps {
   currentStep?: number;
+  onStepClick?: (stepNumber: number) => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ currentStep = 1 }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentStep = 1, onStepClick }) => {
   const workflowSteps = [
     {
       id: 1,
@@ -76,8 +76,15 @@ const Sidebar: React.FC<SidebarProps> = ({ currentStep = 1 }) => {
     }
   };
 
+  const handleStepClick = (stepId: number) => {
+    if (onStepClick && stepId <= currentStep) {
+      onStepClick(stepId);
+    }
+  };
+
   return (
     <div className="w-80 bg-slate-900 text-white min-h-screen p-6">
+      
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-6">
           <div className="bg-blue-600 rounded-lg p-2">
@@ -101,9 +108,18 @@ const Sidebar: React.FC<SidebarProps> = ({ currentStep = 1 }) => {
           {workflowSteps.map((step, index) => {
             const Icon = step.icon;
             const status = getStepStatus(step);
+            const isClickable = step.id <= currentStep;
             
             return (
-              <div key={step.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors">
+              <div 
+                key={step.id} 
+                className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
+                  isClickable 
+                    ? 'hover:bg-slate-800 cursor-pointer' 
+                    : 'cursor-not-allowed opacity-60'
+                }`}
+                onClick={() => handleStepClick(step.id)}
+              >
                 <div className={`p-2 rounded-lg ${
                   status === 'active' ? 'bg-blue-600' : 
                   status === 'completed' ? 'bg-green-600' : 
@@ -124,6 +140,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentStep = 1 }) => {
         </div>
       </div>
 
+      
       <div className="mt-8 p-4 bg-slate-800 rounded-lg">
         <div className="flex items-center gap-2 mb-2">
           <Clock className="h-4 w-4 text-blue-400" />
