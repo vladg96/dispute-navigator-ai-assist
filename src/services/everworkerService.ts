@@ -23,7 +23,7 @@ export interface EverworkerIdentityResponse {
 
 export class EverworkerService {
   private static readonly API_ENDPOINT = 'https://api.everworker.ai/v1/agents/consumer-identity-validator';
-  private static readonly API_KEY = process.env.EVERWORKER_API_KEY || '';
+  private static readonly API_KEY = import.meta.env.VITE_EVERWORKER_API_KEY || '';
 
   static async validateConsumerIdentity(data: EverworkerIdentityRequest): Promise<EverworkerIdentityResponse> {
     try {
