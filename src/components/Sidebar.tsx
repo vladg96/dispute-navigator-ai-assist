@@ -87,23 +87,18 @@ const Sidebar: React.FC<SidebarProps> = ({ currentStep = 1, onStepClick }) => {
     <div className="w-80 bg-slate-900 text-white min-h-screen p-6">
       
       <div className="mb-8">
-        {/* Header with logo, title, and badges in horizontal layout */}
-        <div className="flex items-center justify-between mb-6">
-          {/* Logo section */}
+        <div className="flex items-center gap-3 mb-6">
           <div className="bg-blue-600 rounded-lg p-2">
             <span className="text-white font-bold text-sm">تكامل</span>
           </div>
-          
-          {/* Title section */}
-          <div className="flex-1 mx-4">
-            <h1 className="text-lg font-semibold text-center">AI Aviation Dispute Platform</h1>
+          <div>
+            <h1 className="text-xl font-semibold">AI Aviation Dispute Platform</h1>
           </div>
-          
-          {/* Badges section - horizontal layout */}
-          <div className="flex gap-2">
-            <span className="bg-blue-600 text-xs px-3 py-1 rounded-full">AI POWERED</span>
-            <span className="text-gray-400 text-xs px-3 py-1 rounded-full border border-gray-600">Reset</span>
-          </div>
+        </div>
+        
+        <div className="flex gap-2 mb-2">
+          <span className="bg-blue-600 text-xs px-3 py-1 rounded-full">POWERED BY EVERWORKER</span>
+          <span className="text-gray-400 text-xs px-3 py-1 rounded-full border border-gray-600">Reset</span>
         </div>
       </div>
 
