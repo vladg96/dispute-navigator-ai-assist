@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { CheckCircle, FileText, Search, Shield, Clock, User, Plane, AlertCircle, Upload } from 'lucide-react';
 
@@ -96,7 +97,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentStep = 1, onStepClick }) => {
         </div>
         
         <div className="flex gap-2 mb-2">
-          <span className="bg-blue-600 text-xs px-3 py-1 rounded-full">AI POWERED</span>
+          <span className="bg-blue-600 text-xs px-3 py-1 rounded-full">POWERED BY EVERWORKER</span>
           <span className="text-gray-400 text-xs px-3 py-1 rounded-full border border-gray-600">Reset</span>
         </div>
       </div>
