@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card } from '@/components/ui/card';
@@ -53,6 +53,51 @@ const DisputeForm = () => {
   const [isCheckingEligibility, setIsCheckingEligibility] = useState(false);
 
   const totalSteps = 4; // Keep original validation steps count
+
+  // Add effect to watch for eligibility data changes
+  useEffect(() => {
+    if (currentStep === 5 && isCheckingEligibility) {
+      const checkEligibilityStatus = () => {
+        if (IntegrailService.hasEligibilityCheckError()) {
+          const error = IntegrailService.getEligibilityCheckError();
+          toast({
+            title: "Eligibility Check Failed",
+            description: error?.message || "Please try submitting your complaint details again.",
+            variant: "destructive"
+          });
+          setCurrentStep(3);
+          setIsCheckingEligibility(false);
+          return;
+        }
+
+        if (IntegrailService.isEligibilityCheckComplete()) {
+          const eligibilityData = IntegrailService.getEligibilityData();
+          if (eligibilityData) {
+            setEligibilityResult({
+              status: 'eligible',
+              message: 'Your dispute meets all requirements and will be processed.',
+              details: {
+                applicableRegulations: eligibilityData.applicableRegulations,
+                claimValuation: eligibilityData.claimValuation,
+                eligibilityAssessment: eligibilityData.eligibilityAssesment,
+                consumerFriendlyVersion: eligibilityData.consumerFriendlyVersion
+              }
+            });
+            setIsCheckingEligibility(false);
+          }
+        }
+      };
+
+      // Check immediately
+      checkEligibilityStatus();
+
+      // Set up polling interval
+      const interval = setInterval(checkEligibilityStatus, 1000);
+
+      // Cleanup interval on unmount or when eligibility check completes
+      return () => clearInterval(interval);
+    }
+  }, [currentStep, isCheckingEligibility]);
 
   const handleInputChange = (field: keyof DisputeFormData, value: string | boolean | File | null) => {
     setFormData(prev => ({
@@ -233,68 +278,24 @@ const DisputeForm = () => {
       return;
     }
 
-    const processEligibilityData = (eligibilityData: IntegrailEligibilityData) => {
-      console.log('Eligibility data:', eligibilityData);
-      setEligibilityResult({
-        status: 'eligible',
-        message: 'Your dispute meets all requirements and will be processed.',
-        details: {
-          applicableRegulations: eligibilityData.applicableRegulations,
-          claimValuation: eligibilityData.claimValuation,
-          eligibilityAssessment: eligibilityData.eligibilityAssesment,
-          consumerFriendlyVersion: eligibilityData.consumerFriendlyVersion
-        }
-      });
-      setCurrentStep(5);
-      setIsCheckingEligibility(false);
-    };
-    
     // Check if eligibility data is already available
     if (IntegrailService.isEligibilityCheckComplete()) {
       const eligibilityData = IntegrailService.getEligibilityData();
       if (eligibilityData) {
-        processEligibilityData(eligibilityData);
+        setEligibilityResult({
+          status: 'eligible',
+          message: 'Your dispute meets all requirements and will be processed.',
+          details: {
+            applicableRegulations: eligibilityData.applicableRegulations,
+            claimValuation: eligibilityData.claimValuation,
+            eligibilityAssessment: eligibilityData.eligibilityAssesment,
+            consumerFriendlyVersion: eligibilityData.consumerFriendlyVersion
+          }
+        });
+        setIsCheckingEligibility(false);
         return;
       }
     }
-
-    // If not complete, show loading state and poll for results
-    const checkInterval = setInterval(() => {
-      if (IntegrailService.hasEligibilityCheckError()) {
-        clearInterval(checkInterval);
-        const error = IntegrailService.getEligibilityCheckError();
-        toast({
-          title: "Eligibility Check Failed",
-          description: error?.message || "Please try submitting your complaint details again.",
-          variant: "destructive"
-        });
-        setCurrentStep(3); // Return to Complaint Details step
-        setIsCheckingEligibility(false);
-        return;
-      }
-
-      if (IntegrailService.isEligibilityCheckComplete()) {
-        clearInterval(checkInterval);
-        const eligibilityData = IntegrailService.getEligibilityData();
-        if (eligibilityData) {
-          processEligibilityData(eligibilityData);
-        }
-      }
-    }, 1000);
-
-    // Clear interval after 30 seconds to prevent infinite checking
-    setTimeout(() => {
-      clearInterval(checkInterval);
-      if (isCheckingEligibility) {
-        setIsCheckingEligibility(false);
-        toast({
-          title: "Eligibility Check Timeout",
-          description: "The eligibility check is taking longer than expected. Please try again.",
-          variant: "destructive"
-        });
-        setCurrentStep(3); // Return to Complaint Details step
-      }
-    }, 30000);
   };
 
   const handleFinalSubmit = () => {
