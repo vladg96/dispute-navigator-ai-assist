@@ -8,6 +8,12 @@ export interface IntegrailFlightData {
   } | null;
 }
 
+export interface IntegrailEligibilityData {
+  applicableRegulations: string;
+  claimValuation: string;
+  eligibilityAssesment: string;
+}
+
 export interface IntegrailExecutionResponse {
   status: string;
   executionId: string;
@@ -40,10 +46,21 @@ export interface MultiDocumentResult {
 
 export class IntegrailService {
   private static readonly API_BASE_URL = 'https://cloud.integrail.ai/api/Q4gmrB8jCfx5MD7Ny';
-  private static readonly AGENT_ID = '7qnxaDK5Z2v8GKTJc';
   private static readonly STORAGE_BASE_URL = 'https://staging-storage-service.integrail.ai/api';
   private static readonly AUTH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2NvdW50SWQiOiJRNGdtckI4akNmeDVNRDdOeSIsImlhdCI6MTc0NTk1NjUxNX0.w-d7F6ufcRto_5R7IDAba1WJxOUHFAVNR9z1rjLl23E';
   private static readonly UPLOAD_TOKEN = 'storage-service-super-staging-api-key';
+
+  private static readonly AGENT_CONFIGS = {
+    FLIGHT_DATA: {
+      id: '7qnxaDK5Z2v8GKTJc',
+      description: 'Flight data extraction agent'
+    },
+    ELIGIBILITY: {
+      id: 'WCfriZh7ZTnnnSpRE',
+      description: 'Eligibility and regulations assessment agent'
+    }
+    // Add more agent configurations as needed
+  } as const;
 
   static async uploadFileToStorage(file: File): Promise<{ url: string; fileName: string }> {
     const formData = new FormData();
@@ -83,22 +100,19 @@ export class IntegrailService {
     }
   }
 
-  static async executeAgent(fileUrl: string, fileName: string): Promise<string> {
+  static async executeAgent(agentType: keyof typeof IntegrailService.AGENT_CONFIGS, inputs: Record<string, any>): Promise<string> {
     try {
-      console.log('Executing agent with file:', fileName);
-      const response = await fetch(`${this.API_BASE_URL}/agent/${this.AGENT_ID}/execute`, {
+      const agentId = this.AGENT_CONFIGS[agentType].id;
+      console.log(`Executing ${this.AGENT_CONFIGS[agentType].description} with inputs:`, inputs);
+      
+      const response = await fetch(`${this.API_BASE_URL}/agent/${agentId}/execute`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.AUTH_TOKEN}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          inputs: {
-            file: {
-              url: fileUrl,
-              fileName: fileName
-            }
-          }
+          inputs
         }),
       });
 
@@ -203,55 +217,78 @@ export class IntegrailService {
     }
   }
 
+  private static async pollExecutionStatus(executionId: string, maxAttempts: number = 300): Promise<IntegrailStatusResponse> {
+    let attempts = 0;
+    
+    while (attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 500)); // Wait 1 second
+      
+      const statusResponse = await this.getExecutionStatus(executionId);
+      console.log(`Attempt ${attempts + 1}: Status = ${statusResponse.execution.status}`);
+      
+      if (statusResponse.execution.status === 'finished' || statusResponse.execution.status === 'failed') {
+        return statusResponse;
+      }
+      
+      attempts++;
+    }
+    
+    throw new Error('Document processing timeout - please try again');
+  }
+
+  static async checkEligibilityAndRegulations(detailedDescription: string): Promise<IntegrailEligibilityData> {
+    console.log('Executing Integrail agent...');
+    const executionId = await this.executeAgent('ELIGIBILITY', {Complaint: detailedDescription});
+    
+    const statusResponse = await this.pollExecutionStatus(executionId);
+    
+    if (statusResponse.execution.status === 'finished') {
+      if (statusResponse.execution.outputs?.['applicableRegulations'] && statusResponse.execution.outputs?.['claimValuation'] && statusResponse.execution.outputs?.['eligibilityAssesment']) {
+        return {
+          applicableRegulations: statusResponse.execution.outputs['applicableRegulations'],
+          claimValuation: statusResponse.execution.outputs['claimValuation'],
+          eligibilityAssesment: statusResponse.execution.outputs['eligibilityAssesment']
+        };
+      } else {
+        throw new Error('No eligibility data extracted from document');
+      }
+    } else {
+      throw new Error('Dispute details processing failed');
+    }
+  }
+
   private static async processDocument(fileUrl: string, fileName: string): Promise<DocumentProcessingResult> {
     try {
       // Execute the agent
-      const executionId = await this.executeAgent(fileUrl, fileName);
+      const executionId = await this.executeAgent('FLIGHT_DATA', { file: { url: fileUrl, fileName: fileName } });
       
       // Poll for completion
-      let attempts = 0;
-      const maxAttempts = 30;
+      const statusResponse = await this.pollExecutionStatus(executionId);
       
-      while (attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        const statusResponse = await this.getExecutionStatus(executionId);
-        
-        if (statusResponse.execution.status === 'finished') {
-          if (statusResponse.execution.outputs?.['2_json']) {
-            return {
-              fileName,
-              status: 'success',
-              data: statusResponse.execution.outputs['2_json'],
-              executionId
-            };
-          } else {
-            return {
-              fileName,
-              status: 'failed',
-              error: 'No flight data extracted from document',
-              executionId
-            };
-          }
-        } else if (statusResponse.execution.status === 'failed') {
+      if (statusResponse.execution.status === 'finished') {
+        if (statusResponse.execution.outputs?.['2_json']) {
+          return {
+            fileName,
+            status: 'success',
+            data: statusResponse.execution.outputs['2_json'],
+            executionId
+          };
+        } else {
           return {
             fileName,
             status: 'failed',
-            error: 'Document processing failed',
+            error: 'No flight data extracted from document',
             executionId
           };
         }
-        
-        attempts++;
+      } else {
+        return {
+          fileName,
+          status: 'failed',
+          error: 'Document processing failed',
+          executionId
+        };
       }
-      
-      return {
-        fileName,
-        status: 'failed',
-        error: 'Processing timeout',
-        executionId
-      };
-      
     } catch (error) {
       console.error(`Error processing document ${fileName}:`, error);
       return {
@@ -259,6 +296,36 @@ export class IntegrailService {
         status: 'failed',
         error: error instanceof Error ? error.message : 'Unknown error'
       };
+    }
+  }
+
+  static async extractFlightData(file: File): Promise<IntegrailFlightData> {
+    try {
+      // Step 1: Upload file to storage
+      console.log('Uploading file to Integrail storage...');
+      const { url, fileName } = await this.uploadFileToStorage(file);
+      
+      // Step 2: Execute the agent
+      console.log('Executing Integrail agent...');
+      const executionId = await this.executeAgent('FLIGHT_DATA', { file: { url: url, fileName: fileName } });
+      
+      // Step 3: Poll for completion
+      console.log('Polling for execution completion...');
+      const statusResponse = await this.pollExecutionStatus(executionId);
+      
+      if (statusResponse.execution.status === 'finished') {
+        if (statusResponse.execution.outputs?.['2_json']) {
+          console.log('Document processing completed successfully');
+          return statusResponse.execution.outputs['2_json'];
+        } else {
+          throw new Error('No flight data extracted from document');
+        }
+      } else {
+        throw new Error('Document processing failed');
+      }
+    } catch (error) {
+      console.error('Error extracting flight data:', error);
+      throw error;
     }
   }
 
@@ -300,48 +367,6 @@ export class IntegrailService {
     });
 
     return merged;
-  }
-
-  static async extractFlightData(file: File): Promise<IntegrailFlightData> {
-    try {
-      // Step 1: Upload file to storage
-      console.log('Uploading file to Integrail storage...');
-      const { url, fileName } = await this.uploadFileToStorage(file);
-      
-      // Step 2: Execute the agent
-      console.log('Executing Integrail agent...');
-      const executionId = await this.executeAgent(url, fileName);
-      
-      // Step 3: Poll for completion
-      console.log('Polling for execution completion...');
-      let attempts = 0;
-      const maxAttempts = 30; // 30 seconds timeout
-      
-      while (attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
-        
-        const statusResponse = await this.getExecutionStatus(executionId);
-        console.log(`Attempt ${attempts + 1}: Status = ${statusResponse.execution.status}`);
-        
-        if (statusResponse.execution.status === 'finished') {
-          if (statusResponse.execution.outputs?.['2_json']) {
-            console.log('Document processing completed successfully');
-            return statusResponse.execution.outputs['2_json'];
-          } else {
-            throw new Error('No flight data extracted from document');
-          }
-        } else if (statusResponse.execution.status === 'failed') {
-          throw new Error('Document processing failed');
-        }
-        
-        attempts++;
-      }
-      
-      throw new Error('Document processing timeout - please try again');
-    } catch (error) {
-      console.error('Error extracting flight data:', error);
-      throw error;
-    }
   }
 
   static formatFlightDataForForm(data: IntegrailFlightData): {

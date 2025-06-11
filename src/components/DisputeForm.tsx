@@ -24,6 +24,7 @@ import { Info, AlertTriangle, CheckCircle, X, Clock } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import Sidebar from './Sidebar';
+import { IntegrailService } from '@/services/integrailService';
 
 const DisputeForm = () => {
   const { toast } = useToast();
@@ -133,6 +134,20 @@ const DisputeForm = () => {
     }
   };
 
+  const handleVerifyComplaintDetails = async () => {
+    if (!formData.disputeCategory || !formData.description) {
+      toast({
+        title: "Invalid Complaint Details",
+        description: "Please enter a valid complaint category and description TEST",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const eligibilityData = await IntegrailService.checkEligibilityAndRegulations(formData.description);
+    console.log('Eligibility data:', eligibilityData);
+  };
+
   const handleVerifyBooking = async () => {
     if (!formData.bookingReference || formData.bookingReference.length !== 6) {
       toast({
@@ -140,6 +155,7 @@ const DisputeForm = () => {
         description: "Please enter a valid 6-character booking reference",
         variant: "destructive"
       });
+
       return;
     }
 
@@ -280,7 +296,7 @@ const DisputeForm = () => {
           />
         );
       case 3:
-        return <ComplaintDetailsStep {...commonProps} />;
+        return <ComplaintDetailsStep {...commonProps} onVerifyComplaintDetails={handleVerifyComplaintDetails} />;
       case 4:
         return <DocumentUploadStep {...commonProps} />;
       default:
