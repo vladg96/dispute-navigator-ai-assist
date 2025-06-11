@@ -913,14 +913,11 @@ export const FlightDataValidationStep: React.FC<ValidationStepProps & {
 };
 
 // Step 3: Complaint Details
-export const ComplaintDetailsStep: React.FC<ValidationStepProps & {
-  onVerifyComplaintDetails: () => void;
-}> = ({
+export const ComplaintDetailsStep: React.FC<ValidationStepProps> = ({
   formData,
   onInputChange,
   onNext,
   onBack,
-  onVerifyComplaintDetails,
   validationResult,
   stepNumber,
   totalSteps
@@ -1027,7 +1024,7 @@ export const ComplaintDetailsStep: React.FC<ValidationStepProps & {
             Back to Flight Data
           </Button>
           <Button 
-            onClick={onVerifyComplaintDetails}
+            onClick={onNext}
             className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
           >
             Continue to Documents

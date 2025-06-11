@@ -12,6 +12,7 @@ export interface IntegrailEligibilityData {
   applicableRegulations: string;
   claimValuation: string;
   eligibilityAssesment: string;
+  consumerFriendlyVersion: string;
 }
 
 export interface IntegrailExecutionResponse {
@@ -56,11 +57,61 @@ export class IntegrailService {
       description: 'Flight data extraction agent'
     },
     ELIGIBILITY: {
-      id: 'WCfriZh7ZTnnnSpRE',
+      id: 'Ph7ainsJ7T4L2XZt4',
       description: 'Eligibility and regulations assessment agent'
     }
     // Add more agent configurations as needed
   } as const;
+
+  private static eligibilityData: IntegrailEligibilityData | null = null;
+  private static eligibilityCheckPromise: Promise<IntegrailEligibilityData> | null = null;
+  private static eligibilityCheckError: Error | null = null;
+
+  static getEligibilityData(): IntegrailEligibilityData | null {
+    return this.eligibilityData;
+  }
+
+  static getEligibilityCheckError(): Error | null {
+    return this.eligibilityCheckError;
+  }
+
+  static async startEligibilityCheck(description: string, flightNumber: string): Promise<void> {
+    if (this.eligibilityCheckPromise) {
+      return; // Already running
+    }
+
+    this.eligibilityCheckError = null;
+    this.eligibilityCheckPromise = this.checkEligibilityAndRegulations(description, flightNumber);
+    
+    try {
+      this.eligibilityData = await this.eligibilityCheckPromise;
+      console.log('Eligibility data:', this.eligibilityData);
+    } catch (error) {
+      console.error('Background eligibility check failed:', error);
+      this.eligibilityCheckError = error instanceof Error ? error : new Error('Unknown error during eligibility check');
+      throw this.eligibilityCheckError;
+    } finally {
+      this.eligibilityCheckPromise = null;
+    }
+  }
+
+  static isEligibilityCheckComplete(): boolean {
+    return this.eligibilityData !== null;
+  }
+
+  static isEligibilityCheckInProgress(): boolean {
+    return this.eligibilityCheckPromise !== null;
+  }
+
+  static hasEligibilityCheckError(): boolean {
+    return this.eligibilityCheckError !== null;
+  }
+
+  static resetEligibilityCheck(): void {
+    this.eligibilityData = null;
+    this.eligibilityCheckPromise = null;
+    this.eligibilityCheckError = null;
+  }
 
   static async uploadFileToStorage(file: File): Promise<{ url: string; fileName: string }> {
     const formData = new FormData();
@@ -236,18 +287,25 @@ export class IntegrailService {
     throw new Error('Document processing timeout - please try again');
   }
 
-  static async checkEligibilityAndRegulations(detailedDescription: string): Promise<IntegrailEligibilityData> {
+  static async checkEligibilityAndRegulations(detailedDescription: string, flightNumber: string): Promise<IntegrailEligibilityData> {
     console.log('Executing Integrail agent...');
-    const executionId = await this.executeAgent('ELIGIBILITY', {Complaint: detailedDescription});
+    const executionId = await this.executeAgent('ELIGIBILITY', {
+      Complaint: detailedDescription,
+      flightNumber: flightNumber
+    });
     
     const statusResponse = await this.pollExecutionStatus(executionId);
     
     if (statusResponse.execution.status === 'finished') {
-      if (statusResponse.execution.outputs?.['applicableRegulations'] && statusResponse.execution.outputs?.['claimValuation'] && statusResponse.execution.outputs?.['eligibilityAssesment']) {
+      if (statusResponse.execution.outputs?.['applicableRegulations'] && 
+          statusResponse.execution.outputs?.['claimValuation'] && 
+          statusResponse.execution.outputs?.['eligibilityAssesment'] &&
+          statusResponse.execution.outputs?.['consumerFriendlyVersion']) {
         return {
           applicableRegulations: statusResponse.execution.outputs['applicableRegulations'],
           claimValuation: statusResponse.execution.outputs['claimValuation'],
-          eligibilityAssesment: statusResponse.execution.outputs['eligibilityAssesment']
+          eligibilityAssesment: statusResponse.execution.outputs['eligibilityAssesment'],
+          consumerFriendlyVersion: statusResponse.execution.outputs['consumerFriendlyVersion']
         };
       } else {
         throw new Error('No eligibility data extracted from document');
@@ -305,23 +363,15 @@ export class IntegrailService {
       console.log('Uploading file to Integrail storage...');
       const { url, fileName } = await this.uploadFileToStorage(file);
       
-      // Step 2: Execute the agent
-      console.log('Executing Integrail agent...');
-      const executionId = await this.executeAgent('FLIGHT_DATA', { file: { url: url, fileName: fileName } });
+      // Step 2: Process the document
+      console.log('Processing document...');
+      const result = await this.processDocument(url, fileName);
       
-      // Step 3: Poll for completion
-      console.log('Polling for execution completion...');
-      const statusResponse = await this.pollExecutionStatus(executionId);
-      
-      if (statusResponse.execution.status === 'finished') {
-        if (statusResponse.execution.outputs?.['2_json']) {
-          console.log('Document processing completed successfully');
-          return statusResponse.execution.outputs['2_json'];
-        } else {
-          throw new Error('No flight data extracted from document');
-        }
+      if (result.status === 'success' && result.data) {
+        console.log('Document processing completed successfully');
+        return result.data;
       } else {
-        throw new Error('Document processing failed');
+        throw new Error(result.error || 'Document processing failed');
       }
     } catch (error) {
       console.error('Error extracting flight data:', error);

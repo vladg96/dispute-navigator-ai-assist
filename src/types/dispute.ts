@@ -1,4 +1,3 @@
-
 export interface DisputeFormData {
   consumerName: string;
   nationalId: string;
@@ -46,7 +45,12 @@ export interface EverworkerValidationResult {
 export interface EligibilityResult {
   status: 'eligible' | 'invalid' | 'hold';
   message: string;
-  details?: string[];
+  details: {
+    applicableRegulations: string;
+    claimValuation: string;
+    eligibilityAssessment: string;
+    consumerFriendlyVersion: string;
+  };
 }
 
 export interface CaseSummary {

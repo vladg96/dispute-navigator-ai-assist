@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DisputeFormData } from '@/types/dispute';
 import { FileText, Calendar, MapPin, Plane, User, AlertCircle, Clock, CheckCircle, Search } from 'lucide-react';
+import { IntegrailService } from '@/services/integrailService';
 
 interface CaseSummaryStepProps {
   formData: DisputeFormData;
@@ -40,7 +41,10 @@ export const CaseSummaryStep: React.FC<CaseSummaryStepProps> = ({
       currentStatus: "Under Initial Review",
       assignedHandler: "AI Processing System",
       nextActionDue: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString(),
-      finalOutput: "Case summary generated and ready for analysis"
+      finalOutput: "Case summary generated and ready for analysis",
+      applicableRegulations: IntegrailService.getEligibilityData()?.applicableRegulations || "Pending assessment",
+      claimValuation: IntegrailService.getEligibilityData()?.claimValuation || "Pending assessment",
+      eligibilityAssessment: IntegrailService.getEligibilityData()?.eligibilityAssesment || "Pending assessment"
     };
 
     console.log('Case Summary Generated:', summaryData);
@@ -272,7 +276,19 @@ export const CaseSummaryStep: React.FC<CaseSummaryStepProps> = ({
             </div>
             <div>
               <p className="text-sm text-gray-400">Requested Resolution</p>
-              <p className="font-medium">{caseSummary.requestedResolution}</p>
+              <p className="text-sm bg-slate-700 p-3 rounded-lg">{caseSummary.requestedResolution}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-400">Eligibility Assessment</p>
+              <p className="text-sm bg-slate-700 p-3 rounded-lg">{caseSummary.eligibilityAssessment}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-400">Claim Valuation</p>
+              <p className="text-sm bg-slate-700 p-3 rounded-lg">{caseSummary.claimValuation}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-400">Applicable Regulations</p>
+              <p className="text-sm bg-slate-700 p-3 rounded-lg">{caseSummary.applicableRegulations}</p>
             </div>
           </CardContent>
         </Card>

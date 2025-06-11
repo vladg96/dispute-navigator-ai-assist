@@ -24,7 +24,7 @@ import { Info, AlertTriangle, CheckCircle, X, Clock } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import Sidebar from './Sidebar';
-import { IntegrailService } from '@/services/integrailService';
+import { IntegrailService, IntegrailEligibilityData } from '@/services/integrailService';
 
 const DisputeForm = () => {
   const { toast } = useToast();
@@ -134,20 +134,6 @@ const DisputeForm = () => {
     }
   };
 
-  const handleVerifyComplaintDetails = async () => {
-    if (!formData.disputeCategory || !formData.description) {
-      toast({
-        title: "Invalid Complaint Details",
-        description: "Please enter a valid complaint category and description TEST",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const eligibilityData = await IntegrailService.checkEligibilityAndRegulations(formData.description);
-    console.log('Eligibility data:', eligibilityData);
-  };
-
   const handleVerifyBooking = async () => {
     if (!formData.bookingReference || formData.bookingReference.length !== 6) {
       toast({
@@ -198,6 +184,22 @@ const DisputeForm = () => {
           });
           return;
         }
+
+        // Start eligibility check in background when moving to documents step
+        if (currentStep === 3) {
+          IntegrailService.startEligibilityCheck(formData.description, formData.flightNumber)
+            .catch(error => {
+              console.error('Failed to start eligibility check:', error);
+              toast({
+                title: "Eligibility Check Failed",
+                description: "Please try submitting your complaint details again.",
+                variant: "destructive"
+              });
+              setCurrentStep(3); // Return to Complaint Details step
+              return;
+            });
+        }
+
         setCurrentStep(prev => prev + 1);
       });
     } else {
@@ -218,26 +220,81 @@ const DisputeForm = () => {
     setIsCheckingEligibility(true);
     setCurrentStep(5); // Move to eligibility check step
     
-    setTimeout(() => {
-      const eligibility = checkEligibility(formData);
-      setEligibilityResult(eligibility);
-      
-      if (eligibility.status === 'eligible') {
-        setCurrentStep(6); // Move to final consent step
-        toast({
-          title: "Eligible for Processing",
-          description: "Your dispute meets all requirements and will be processed.",
-        });
-      } else {
-        toast({
-          title: eligibility.status === 'invalid' ? "Invalid Submission" : "Additional Documents Required",
-          description: eligibility.message,
-          variant: eligibility.status === 'invalid' ? "destructive" : "default"
-        });
-      }
-      
+    // Check if there was an error in the background check
+    if (IntegrailService.hasEligibilityCheckError()) {
+      const error = IntegrailService.getEligibilityCheckError();
+      toast({
+        title: "Eligibility Check Failed",
+        description: error?.message || "Please try submitting your complaint details again.",
+        variant: "destructive"
+      });
+      setCurrentStep(3); // Return to Complaint Details step
       setIsCheckingEligibility(false);
-    }, 2000);
+      return;
+    }
+
+    const processEligibilityData = (eligibilityData: IntegrailEligibilityData) => {
+      console.log('Eligibility data:', eligibilityData);
+      setEligibilityResult({
+        status: 'eligible',
+        message: 'Your dispute meets all requirements and will be processed.',
+        details: {
+          applicableRegulations: eligibilityData.applicableRegulations,
+          claimValuation: eligibilityData.claimValuation,
+          eligibilityAssessment: eligibilityData.eligibilityAssesment,
+          consumerFriendlyVersion: eligibilityData.consumerFriendlyVersion
+        }
+      });
+      setCurrentStep(5);
+      setIsCheckingEligibility(false);
+    };
+    
+    // Check if eligibility data is already available
+    if (IntegrailService.isEligibilityCheckComplete()) {
+      const eligibilityData = IntegrailService.getEligibilityData();
+      if (eligibilityData) {
+        processEligibilityData(eligibilityData);
+        return;
+      }
+    }
+
+    // If not complete, show loading state and poll for results
+    const checkInterval = setInterval(() => {
+      if (IntegrailService.hasEligibilityCheckError()) {
+        clearInterval(checkInterval);
+        const error = IntegrailService.getEligibilityCheckError();
+        toast({
+          title: "Eligibility Check Failed",
+          description: error?.message || "Please try submitting your complaint details again.",
+          variant: "destructive"
+        });
+        setCurrentStep(3); // Return to Complaint Details step
+        setIsCheckingEligibility(false);
+        return;
+      }
+
+      if (IntegrailService.isEligibilityCheckComplete()) {
+        clearInterval(checkInterval);
+        const eligibilityData = IntegrailService.getEligibilityData();
+        if (eligibilityData) {
+          processEligibilityData(eligibilityData);
+        }
+      }
+    }, 1000);
+
+    // Clear interval after 30 seconds to prevent infinite checking
+    setTimeout(() => {
+      clearInterval(checkInterval);
+      if (isCheckingEligibility) {
+        setIsCheckingEligibility(false);
+        toast({
+          title: "Eligibility Check Timeout",
+          description: "The eligibility check is taking longer than expected. Please try again.",
+          variant: "destructive"
+        });
+        setCurrentStep(3); // Return to Complaint Details step
+      }
+    }, 30000);
   };
 
   const handleFinalSubmit = () => {
@@ -296,7 +353,7 @@ const DisputeForm = () => {
           />
         );
       case 3:
-        return <ComplaintDetailsStep {...commonProps} onVerifyComplaintDetails={handleVerifyComplaintDetails} />;
+        return <ComplaintDetailsStep {...commonProps} />;
       case 4:
         return <DocumentUploadStep {...commonProps} />;
       default:
@@ -341,14 +398,10 @@ const DisputeForm = () => {
           
           <p className="text-gray-400 mb-4 text-center">{eligibilityResult.message}</p>
           
-          {eligibilityResult.details && eligibilityResult.details.length > 0 && (
+          {eligibilityResult.details && (
             <div className="bg-slate-700 rounded-lg p-4">
               <h5 className="font-medium mb-2">Details:</h5>
-              <ul className="list-disc list-inside space-y-1 text-sm text-gray-300">
-                {eligibilityResult.details.map((detail, index) => (
-                  <li key={index}>{detail}</li>
-                ))}
-              </ul>
+              <p className="text-sm text-gray-300">{eligibilityResult.details.eligibilityAssessment}</p>
             </div>
           )}
 
