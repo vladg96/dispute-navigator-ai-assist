@@ -71,7 +71,7 @@ export class IntegrailService {
       const result = await response.json();
       console.log('File uploaded successfully:', result);
       return {
-        url: result.url,
+        url: result.link,
         fileName: file.name
       };
     } catch (error) {
