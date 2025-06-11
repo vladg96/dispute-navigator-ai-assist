@@ -41,9 +41,9 @@ export interface MultiDocumentResult {
 export class IntegrailService {
   private static readonly API_BASE_URL = 'https://cloud.integrail.ai/api/Q4gmrB8jCfx5MD7Ny';
   private static readonly AGENT_ID = '7qnxaDK5Z2v8GKTJc';
-  private static readonly STORAGE_BASE_URL = 'https://storage-service.integrail.ai/api';
+  private static readonly STORAGE_BASE_URL = 'https://staging-storage-service.integrail.ai/api';
   private static readonly AUTH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2NvdW50SWQiOiJRNGdtckI4akNmeDVNRDdOeSIsImlhdCI6MTc0NTk1NjUxNX0.w-d7F6ufcRto_5R7IDAba1WJxOUHFAVNR9z1rjLl23E';
-  private static readonly UPLOAD_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2NvdW50SWQiOiJRNGdtckI4akNmeDVNRDdOeSIsInVzZXJJZCI6IlE0Z21yQjhqQ2Z4NU1EN055IiwiaWF0IjoxNzQ1OTc1NTk0LCJleHAiOjE3NDYwNjE5OTR9.lMQR-BqWm0S2cUpGhNcI0X3E8OqgD5dqd-wXaIzQZHQ';
+  private static readonly UPLOAD_TOKEN = 'storage-service-super-staging-api-key';
 
   static async uploadFileToStorage(file: File): Promise<{ url: string; fileName: string }> {
     const formData = new FormData();
@@ -53,10 +53,11 @@ export class IntegrailService {
     console.log('Uploading file to Integrail storage...');
 
     try {
-      const response = await fetch(`${this.STORAGE_BASE_URL}/upload`, {
+      const response = await fetch(`${this.STORAGE_BASE_URL}/upload?ttl_minutes=3000`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.UPLOAD_TOKEN}`,
+          'authorization': `Bearer ${this.UPLOAD_TOKEN}`,
+          'Accept': 'application/json'
         },
         body: formData,
       });
@@ -169,8 +170,7 @@ export class IntegrailService {
           executionPromises.push(Promise.resolve({
             fileName: result.fileName,
             status: 'failed',
-            error: `Upload failed: ${result.error}`
-          }));
+            error: `Upload failed: ${result.error}`          }));
         } else {
           executionPromises.push(
             this.processDocument(result.url, result.fileName)
@@ -372,3 +372,4 @@ export class IntegrailService {
     };
   }
 }
+
