@@ -174,7 +174,7 @@ const DisputeForm = () => {
   const handleNext = () => {
     if (currentStep < totalSteps) {
       handleStepValidation(currentStep, () => {
-        if (currentStep === 2 && !bookingVerificationResult?.exists) {
+        if (currentStep === 2 && bookingVerificationResult?.exists) {
           toast({
             title: "Booking Verification Required",
             description: "Please verify your booking reference before proceeding.",

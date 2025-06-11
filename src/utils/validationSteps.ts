@@ -115,11 +115,11 @@ export const validateFlightData = (formData: Partial<DisputeFormData>): StepVali
   }
 
   // Flight number validation
-  if (!formData.flightNumber?.trim()) {
-    errors.push("Flight number is required");
-  } else if (!/^SV\d+$/i.test(formData.flightNumber)) {
-    errors.push("Flight number must start with 'SV' followed by numbers (e.g., SV123)");
-  }
+  // if (!formData.flightNumber?.trim()) {
+  //   errors.push("Flight number is required");
+  // } else if (!/^SV\d+$/i.test(formData.flightNumber)) {
+  //   errors.push("Flight number must start with 'SV' followed by numbers (e.g., SV123)");
+  // }
 
   // Flight date validation
   if (!formData.flightDate) {
