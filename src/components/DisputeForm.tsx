@@ -364,19 +364,30 @@ const DisputeForm = () => {
   const renderEligibilityCheck = () => (
     <div className="space-y-6">
       <div className="text-center">
-        <Clock className="h-16 w-16 text-blue-500 mx-auto mb-4 animate-spin" />
-        <h3 className="text-2xl font-semibold mb-2 text-white">
-          {isCheckingEligibility ? 'Checking Eligibility...' : 'Eligibility Assessment Complete'}
-        </h3>
-        <p className="text-gray-400 mb-6">
-          {isCheckingEligibility 
-            ? 'Running validation against GACA regulations and airline policies...'
-            : 'Your dispute has been assessed for eligibility'
-          }
-        </p>
+        {isCheckingEligibility ? (
+          <>
+            <Clock className="h-16 w-16 text-blue-500 mx-auto mb-4 animate-spin" />
+            <h3 className="text-2xl font-semibold mb-2 text-white">
+              Checking Eligibility...
+            </h3>
+            <p className="text-gray-400 mb-6">
+              Running validation against GACA regulations and airline policies...
+            </p>
+          </>
+        ) : (
+          <>
+            <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+            <h3 className="text-2xl font-semibold mb-2 text-white">
+              Eligibility Assessment Complete
+            </h3>
+            <p className="text-gray-400 mb-6">
+              Your dispute has been assessed for eligibility
+            </p>
+          </>
+        )}
       </div>
 
-      {eligibilityResult && !isCheckingEligibility && (
+      {!isCheckingEligibility && eligibilityResult && (
         <Card className="p-6 bg-slate-800 border-slate-700 text-white">
           <div className="flex items-center justify-center mb-4">
             {eligibilityResult.status === 'eligible' && (
