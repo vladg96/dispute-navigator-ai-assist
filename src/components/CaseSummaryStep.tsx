@@ -258,7 +258,7 @@ export const CaseSummaryStep: React.FC<CaseSummaryStepProps> = ({
         </Card>
 
         {/* Dispute Details */}
-        <Card className="bg-slate-800 border-slate-700 text-white">
+        <Card className="bg-slate-800 border-slate-700 text-white" style={{ display: 'none' }}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-red-400" />
