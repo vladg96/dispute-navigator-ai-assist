@@ -36,7 +36,7 @@ export const DocumentAnalysisStep: React.FC<DocumentAnalysisStepProps> = ({
       </div>
 
       <div className="grid gap-6">
-        <Card className="bg-slate-800 border-slate-700">
+        <Card className="bg-slate-800 border-slate-700" style={{ display: 'none' }}>
           <CardHeader>
             <CardTitle className="text-xl font-semibold text-white text-center">Consumer-Friendly Analysis</CardTitle>
           </CardHeader>
