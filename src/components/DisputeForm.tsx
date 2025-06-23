@@ -1,9 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { checkEligibility } from '@/utils/disputeValidation';
 import { 
   validateConsumerIdentity, 
   validateFlightData, 
@@ -20,11 +18,11 @@ import {
 } from './ValidationSteps';
 import { CaseSummaryStep } from './CaseSummaryStep';
 import { DocumentAnalysisStep } from './DocumentAnalysisStep';
-import { Info, AlertTriangle, CheckCircle, X, Clock } from 'lucide-react';
+import { Info, CheckCircle, X, Clock } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import Sidebar from './Sidebar';
-import { IntegrailService, IntegrailEligibilityData } from '@/services/integrailService';
+import { IntegrailService } from '@/services/integrailService';
 import emailjs from '@emailjs/browser';
 
 // Initialize EmailJS (alternative to HTML script)
