@@ -1,9 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { checkEligibility } from '@/utils/disputeValidation';
 import { 
   validateConsumerIdentity, 
   validateFlightData, 
@@ -20,11 +18,15 @@ import {
 } from './ValidationSteps';
 import { CaseSummaryStep } from './CaseSummaryStep';
 import { DocumentAnalysisStep } from './DocumentAnalysisStep';
-import { Info, AlertTriangle, CheckCircle, X, Clock } from 'lucide-react';
+import { Info, CheckCircle, X, Clock } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import Sidebar from './Sidebar';
-import { IntegrailService, IntegrailEligibilityData } from '@/services/integrailService';
+import { IntegrailService } from '@/services/integrailService';
+import emailjs from '@emailjs/browser';
+
+// Initialize EmailJS with environment variable
+emailjs.init(import.meta.env.VITE_EMAILJS_PUBLIC_KEY || "");
 
 const DisputeForm = () => {
   const { toast } = useToast();
@@ -519,6 +521,40 @@ const DisputeForm = () => {
           <DocumentAnalysisStep
             formData={formData}
             onNext={() => {
+              // Send notification email using EmailJS
+              const templateParams = {
+                to_email: "andrei.cristea@everworker.ai",
+                subject: `New Dispute Case Filed - ${formData.bookingReference}`,
+                passenger_name: formData.consumerName,
+                passenger_email: formData.email,
+                passenger_phone: formData.phone,
+                passenger_national_id: formData.nationalId,
+                booking_reference: formData.bookingReference,
+                flight_number: formData.flightNumber,
+                flight_date: formData.flightDate,
+                route: `${formData.origin} to ${formData.destination}`,
+                dispute_category: formData.disputeCategory,
+                dispute_description: formData.description,
+                has_documents: formData.hasDocuments ? 'Yes' : 'No',
+                consent_status: formData.consentGiven ? 'Provided' : 'Not Provided',
+                submission_timestamp: new Date().toISOString()
+              };
+
+              // Send email using EmailJS
+              emailjs.send(
+                import.meta.env.VITE_EMAILJS_SERVICE_ID || '', // Service ID from environment
+                import.meta.env.VITE_EMAILJS_TEMPLATE_ID || '', // Template ID from environment
+                templateParams
+              ).then(
+                (response) => {
+                  console.log('Email sent successfully:', response);
+                },
+                (error) => {
+                  console.error('Failed to send email:', error);
+                  // Continue with the flow even if email fails
+                }
+              );
+
               toast({
                 title: "Analysis Complete",
                 description: "Your dispute case has been fully processed and submitted.",
