@@ -25,6 +25,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import Sidebar from './Sidebar';
 import { IntegrailService, IntegrailEligibilityData } from '@/services/integrailService';
+import emailjs from '@emailjs/browser';
+
+// Initialize EmailJS (alternative to HTML script)
+emailjs.init(""); // Replace with your actual public key
 
 const DisputeForm = () => {
   const { toast } = useToast();
@@ -519,6 +523,40 @@ const DisputeForm = () => {
           <DocumentAnalysisStep
             formData={formData}
             onNext={() => {
+              // Send notification email using EmailJS
+              const templateParams = {
+                to_email: "andrei.cristea@everworker.ai",
+                subject: `New Dispute Case Filed - ${formData.bookingReference}`,
+                passenger_name: formData.consumerName,
+                passenger_email: formData.email,
+                passenger_phone: formData.phone,
+                passenger_national_id: formData.nationalId,
+                booking_reference: formData.bookingReference,
+                flight_number: formData.flightNumber,
+                flight_date: formData.flightDate,
+                route: `${formData.origin} to ${formData.destination}`,
+                dispute_category: formData.disputeCategory,
+                dispute_description: formData.description,
+                has_documents: formData.hasDocuments ? 'Yes' : 'No',
+                consent_status: formData.consentGiven ? 'Provided' : 'Not Provided',
+                submission_timestamp: new Date().toISOString()
+              };
+
+              // Send email using EmailJS
+              emailjs.send(
+                '', // Replace with your EmailJS service ID
+                '', // Replace with your EmailJS template ID
+                templateParams
+              ).then(
+                (response) => {
+                  console.log('Email sent successfully:', response);
+                },
+                (error) => {
+                  console.error('Failed to send email:', error);
+                  // Continue with the flow even if email fails
+                }
+              );
+
               toast({
                 title: "Analysis Complete",
                 description: "Your dispute case has been fully processed and submitted.",
