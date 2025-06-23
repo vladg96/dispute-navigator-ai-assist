@@ -537,7 +537,14 @@ const DisputeForm = () => {
                 dispute_description: formData.description,
                 has_documents: formData.hasDocuments ? 'Yes' : 'No',
                 consent_status: formData.consentGiven ? 'Provided' : 'Not Provided',
-                submission_timestamp: new Date().toISOString()
+                submission_timestamp: new Date().toISOString(),
+                // Eligibility Assessment Results
+                eligibility_status: eligibilityResult?.status || 'Not Available',
+                eligibility_message: eligibilityResult?.message || 'Not Available',
+                applicable_regulations: eligibilityResult?.details?.applicableRegulations || 'Not Available',
+                claim_valuation: eligibilityResult?.details?.claimValuation || 'Not Available',
+                eligibility_assessment: eligibilityResult?.details?.eligibilityAssessment || 'Not Available',
+                consumer_friendly_version: eligibilityResult?.details?.consumerFriendlyVersion || 'Not Available'
               };
 
               // Send email using EmailJS with environment variables from GitHub secrets
