@@ -25,8 +25,8 @@ import Sidebar from './Sidebar';
 import { IntegrailService } from '@/services/integrailService';
 import emailjs from '@emailjs/browser';
 
-// Initialize EmailJS (alternative to HTML script)
-emailjs.init(""); // Replace with your actual public key
+// Initialize EmailJS with environment variable
+emailjs.init(import.meta.env.VITE_EMAILJS_PUBLIC_KEY || "");
 
 const DisputeForm = () => {
   const { toast } = useToast();
@@ -542,8 +542,8 @@ const DisputeForm = () => {
 
               // Send email using EmailJS
               emailjs.send(
-                '', // Replace with your EmailJS service ID
-                '', // Replace with your EmailJS template ID
+                import.meta.env.VITE_EMAILJS_SERVICE_ID || '', // Service ID from environment
+                import.meta.env.VITE_EMAILJS_TEMPLATE_ID || '', // Template ID from environment
                 templateParams
               ).then(
                 (response) => {
