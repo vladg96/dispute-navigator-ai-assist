@@ -25,9 +25,8 @@ import Sidebar from './Sidebar';
 import { IntegrailService } from '@/services/integrailService';
 import emailjs from '@emailjs/browser';
 
-// Initialize EmailJS with environment variable or runtime config
-const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || (window as any).APP_CONFIG?.EMAILJS_PUBLIC_KEY || "";
-emailjs.init(publicKey);
+// Initialize EmailJS with environment variable from GitHub secrets
+emailjs.init(import.meta.env.VITE_EMAILJS_PUBLIC_KEY || "");
 
 const DisputeForm = () => {
   const { toast } = useToast();
@@ -524,7 +523,7 @@ const DisputeForm = () => {
             onNext={() => {
               // Send notification email using EmailJS
               const templateParams = {
-                to_email: import.meta.env.VITE_NOTIFICATION_EMAIL || (window as any).APP_CONFIG?.NOTIFICATION_EMAIL || '',
+                to_email: import.meta.env.VITE_NOTIFICATION_EMAIL || '',
                 subject: `New Dispute Case Filed - ${formData.bookingReference}`,
                 passenger_name: formData.consumerName,
                 passenger_email: formData.email,
@@ -541,13 +540,10 @@ const DisputeForm = () => {
                 submission_timestamp: new Date().toISOString()
               };
 
-              // Send email using EmailJS with fallback to runtime config
-              const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID || (window as any).APP_CONFIG?.EMAILJS_SERVICE_ID || '';
-              const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || (window as any).APP_CONFIG?.EMAILJS_TEMPLATE_ID || '';
-              
+              // Send email using EmailJS with environment variables from GitHub secrets
               emailjs.send(
-                serviceId,
-                templateId,
+                import.meta.env.VITE_EMAILJS_SERVICE_ID || '',
+                import.meta.env.VITE_EMAILJS_TEMPLATE_ID || '',
                 templateParams
               ).then(
                 (response) => {
