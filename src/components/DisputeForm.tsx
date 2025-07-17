@@ -23,6 +23,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import Sidebar from './Sidebar';
 import { IntegrailService } from '@/services/integrailService';
+import { DisputeSubmissionService } from '@/services/disputeSubmissionService';
 import emailjs from '@emailjs/browser';
 
 // Initialize EmailJS with environment variable from GitHub secrets
@@ -44,7 +45,8 @@ const DisputeForm = () => {
     disputeCategory: '',
     description: '',
     hasDocuments: false,
-    consentGiven: false
+    consentGiven: false,
+    uploadedFiles: []
   });
 
   const [currentStep, setCurrentStep] = useState(1);
@@ -300,7 +302,7 @@ const DisputeForm = () => {
     }
   };
 
-  const handleFinalSubmit = () => {
+  const handleFinalSubmit = async () => {
     if (!formData.consentGiven) {
       toast({
         title: "Consent Required",
@@ -310,26 +312,49 @@ const DisputeForm = () => {
       return;
     }
 
-    const caseId = `CS-2025-${Date.now().toString().slice(-6)}`;
-    
-    toast({
-      title: "Dispute Submitted Successfully",
-      description: `Case ID: ${caseId}`,
-    });
+    try {
+      // Submit to Supabase
+      const result = await DisputeSubmissionService.submitDispute({
+        formData,
+        eligibilityResult,
+        uploadedFiles: formData.uploadedFiles
+      });
 
-    console.log('Case Summary Generated:', {
-      caseId,
-      consumerName: formData.consumerName,
-      bookingReference: formData.bookingReference,
-      flightDetails: `${formData.flightNumber}, ${formData.flightDate}`,
-      route: `${formData.origin} → ${formData.destination}`,
-      disputeCategory: formData.disputeCategory,
-      status: 'Under Review',
-      timestamp: new Date().toISOString()
-    });
+      if (result.success) {
+        toast({
+          title: "Dispute Submitted Successfully",
+          description: `Case ID: ${result.caseId}`,
+        });
 
-    // Navigate to case summary after consent
-    setCurrentStep(7);
+        console.log('Case Summary Generated:', {
+          caseId: result.caseId,
+          disputeId: result.disputeId,
+          consumerName: formData.consumerName,
+          bookingReference: formData.bookingReference,
+          flightDetails: `${formData.flightNumber}, ${formData.flightDate}`,
+          route: `${formData.origin} → ${formData.destination}`,
+          disputeCategory: formData.disputeCategory,
+          status: 'Under Review',
+          timestamp: new Date().toISOString()
+        });
+
+        // Navigate to case summary after successful submission
+        setCurrentStep(7);
+      } else {
+        toast({
+          title: "Submission Failed",
+          description: result.error || "Failed to submit dispute. Please try again.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error submitting dispute:', error);
+      toast({
+        title: "Submission Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const renderValidationSteps = () => {

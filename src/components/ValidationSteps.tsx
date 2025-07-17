@@ -1045,6 +1045,38 @@ export const DocumentUploadStep: React.FC<ValidationStepProps> = ({
   stepNumber,
   totalSteps
 }) => {
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    
+    // Validate file sizes (max 10MB each)
+    const validFiles = files.filter(file => {
+      if (file.size > 10 * 1024 * 1024) {
+        console.warn(`File ${file.name} is too large (${file.size} bytes)`);
+        return false;
+      }
+      return true;
+    });
+    
+    // Add to existing files
+    const newFiles = [...formData.uploadedFiles, ...validFiles];
+    onInputChange('uploadedFiles', newFiles);
+    
+    // Set hasDocuments to true if files are uploaded
+    if (validFiles.length > 0) {
+      onInputChange('hasDocuments', true);
+    }
+  };
+
+  const removeFile = (index: number) => {
+    const newFiles = formData.uploadedFiles.filter((_, i) => i !== index);
+    onInputChange('uploadedFiles', newFiles);
+    
+    // Set hasDocuments to false if no files remain
+    if (newFiles.length === 0) {
+      onInputChange('hasDocuments', false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="text-center">
@@ -1077,13 +1109,50 @@ export const DocumentUploadStep: React.FC<ValidationStepProps> = ({
               <p className="text-sm">Drag and drop files here or click to browse</p>
               <p className="text-xs mt-2">Supported formats: PDF, JPG, PNG, DOC (Max 10MB each)</p>
             </div>
-            <Button 
-              variant="outline" 
-              className="bg-slate-700 text-white hover:bg-slate-600"
-            >
-              Choose Files
-            </Button>
+            <input
+              type="file"
+              multiple
+              accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+              onChange={handleFileUpload}
+              className="hidden"
+              id="file-upload"
+            />
+            <label htmlFor="file-upload">
+              <Button 
+                variant="outline" 
+                className="bg-slate-700 text-white hover:bg-slate-600"
+                asChild
+              >
+                <span>Choose Files</span>
+              </Button>
+            </label>
           </div>
+
+          {/* Display uploaded files */}
+          {formData.uploadedFiles.length > 0 && (
+            <div className="space-y-2">
+              <h5 className="font-medium text-white">Uploaded Files:</h5>
+              {formData.uploadedFiles.map((file, index) => (
+                <div key={index} className="flex items-center justify-between bg-slate-700 p-3 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <FileText className="h-4 w-4 text-blue-400" />
+                    <span className="text-sm text-white">{file.name}</span>
+                    <span className="text-xs text-gray-400">
+                      ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeFile(index)}
+                    className="text-red-400 hover:text-red-300"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="flex items-center space-x-2">
             <Checkbox

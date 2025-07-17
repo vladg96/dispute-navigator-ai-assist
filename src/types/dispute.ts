@@ -13,6 +13,7 @@ export interface DisputeFormData {
   description: string;
   hasDocuments: boolean;
   consentGiven: boolean;
+  uploadedFiles: File[];
 }
 
 export interface ValidationResult {
