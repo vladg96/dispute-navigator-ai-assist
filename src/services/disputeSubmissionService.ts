@@ -33,7 +33,9 @@ export class DisputeSubmissionService {
         priority: this.determinePriority(data.formData.disputeCategory),
         submitted_date: new Date().toISOString(),
         transaction_id: data.formData.bookingReference || `TXN-${Date.now()}`,
-        current_reply: data.eligibilityResult?.details?.consumerFriendlyVersion || null
+        current_reply: data.eligibilityResult?.details?.consumerFriendlyVersion || null,
+        claim_valuation: data.eligibilityResult?.details?.claimValuation || null,
+        applicable_regulations: data.eligibilityResult?.details?.applicableRegulations || null
       };
 
       // Log the dispute data for debugging
@@ -62,7 +64,9 @@ export class DisputeSubmissionService {
           // Simulate successful submission for demo
           const simulatedDisputeData = {
             ...disputeData,
-            current_reply: data.eligibilityResult?.details?.consumerFriendlyVersion || null
+            current_reply: data.eligibilityResult?.details?.consumerFriendlyVersion || null,
+            claim_valuation: data.eligibilityResult?.details?.claimValuation || null,
+            applicable_regulations: data.eligibilityResult?.details?.applicableRegulations || null
           };
           
           const simulatedDispute = {
